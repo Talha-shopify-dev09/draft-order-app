@@ -82,202 +82,136 @@
 
 <script>
   (function() {
-    // 1. Setup & Configuration
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     const shop = '{{ shop.permanent_domain }}';
     
-    // PRODUCTION URL
+    // UPDATE THIS IF NEEDED
     const appUrl = 'https://draft-order-app-rk3s.onrender.com';
     
-    // Global State
     let orderData = null;
-    let currentSelections = {}; // Stores { GroupName: { label, price } }
 
     if (!token) {
-      showError('No order token provided');
-      return;
+       document.getElementById('order-error').style.display = 'block';
+       document.getElementById('error-message').textContent = 'Missing Token in URL';
+       document.getElementById('order-loading').style.display = 'none';
+       return;
     }
-    
-    // 2. Fetch Order Data
+
+    // Fetch Order
     fetch(`${appUrl}/api/get-order?token=${token}&shop=${shop}`, {
         mode: 'cors',
         credentials: 'omit',
         headers: { 'Content-Type': 'application/json' }
     })
-      .then(res => {
-         if (!res.ok) throw new Error(`Server returned ${res.status}`);
-         return res.json();
-      })
-      .then(data => {
-        console.log('Order data:', data);
+    .then(res => res.json())
+    .then(data => {
+        console.log("API Response:", data); // Check Console for this!
+
         if (data.success) {
-          orderData = data;
-          renderOrder(data);
+            orderData = data;
+            renderOrder(data);
         } else {
-          showError(data.error || 'Order not found');
+            throw new Error(data.error || "Order not found");
         }
-      })
-      .catch(err => {
-        console.error('Fetch error:', err);
-        showError('Failed to load order. Please contact support.');
-      });
-    
-    // 3. Render Functions
-    function renderOrder(data) {
-      document.getElementById('order-loading').style.display = 'none';
-      document.getElementById('order-content').style.display = 'grid';
-      
-      // Image
-      if (data.productImage && data.productImage.length > 0) {
-        const imgEl = document.getElementById('product-image');
-        imgEl.src = data.productImage;
-        imgEl.alt = data.productTitle;
-        imgEl.style.display = 'block';
-      } else {
-        document.querySelector('.product-image-wrapper').innerHTML = '<p style="color: #999;">No image available</p>';
-      }
-      
-      // Title & Note
-      document.getElementById('product-title').textContent = data.productTitle;
-      if (data.note) document.getElementById('product-note').textContent = data.note;
-      
-      // *** RENDER OPTION GROUPS ***
-      const container = document.getElementById('options-container');
-      container.innerHTML = ''; // Clear existing
-      
-      // Check if we have new Option Groups or fallback to old Variants
-      const optionGroups = data.optionGroups || [];
-      
-      if (optionGroups.length > 0) {
-        // Render Dropdowns
-        optionGroups.forEach(group => {
-           const groupDiv = document.createElement('div');
-           groupDiv.className = 'option-group';
-           
-           const label = document.createElement('label');
-           label.className = 'option-label';
-           label.innerText = group.name;
-           
-           const select = document.createElement('select');
-           select.className = 'option-select';
-           select.dataset.groupName = group.name; // Tag for identification
-           
-           group.values.forEach(val => {
-             const option = document.createElement('option');
-             option.value = val.label;
-             option.dataset.price = val.price; // Store price in data attribute
-             // Display: "10x10 (+$10.00)"
-             const priceDisplay = parseFloat(val.price) > 0 ? ` (+$${val.price})` : '';
-             option.innerText = `${val.label}${priceDisplay}`;
-             select.appendChild(option);
-           });
-           
-           // Event Listener for Price Update
-           select.addEventListener('change', updateTotalPrice);
-           
-           groupDiv.appendChild(label);
-           groupDiv.appendChild(select);
-           container.appendChild(groupDiv);
-        });
-        
-        // Initial Price Calculation
-        updateTotalPrice();
-        
-      } else if (data.variants && data.variants.length > 0) {
-        // FALLBACK: Support for old orders created before this update
-        const groupDiv = document.createElement('div');
-        groupDiv.innerHTML = '<p>Select Option:</p>';
-        const select = document.createElement('select');
-        select.className = 'option-select';
-        select.dataset.groupName = "Variant";
-        
-        data.variants.forEach(v => {
-           const option = document.createElement('option');
-           option.value = v.name;
-           option.dataset.price = v.price;
-           option.innerText = `${v.name} - $${v.price}`;
-           select.appendChild(option);
-        });
-        select.addEventListener('change', updateTotalPrice);
-        groupDiv.appendChild(select);
-        container.appendChild(groupDiv);
-        updateTotalPrice();
-      }
-    }
-    
-    // 4. Price Calculation Logic
-    function updateTotalPrice() {
-       let total = 0;
-       const selects = document.querySelectorAll('.option-select');
-       
-       // Loop through all dropdowns
-       selects.forEach(select => {
-          const selectedOption = select.options[select.selectedIndex];
-          const price = parseFloat(selectedOption.dataset.price) || 0;
-          total += price;
-       });
-       
-       document.getElementById('product-price').innerText = `$${total.toFixed(2)}`;
-    }
-    
-    function showError(message) {
-      document.getElementById('order-loading').style.display = 'none';
-      document.getElementById('order-error').style.display = 'block';
-      document.getElementById('error-message').textContent = message;
-    }
-    
-    // 5. Checkout Logic
-    document.getElementById('checkout-button').addEventListener('click', function() {
-      const button = this;
-      button.disabled = true;
-      button.textContent = 'Processing...';
-      
-      // Gather Selections
-      const selects = document.querySelectorAll('.option-select');
-      const selectionParts = [];
-      let finalPrice = 0;
-      
-      selects.forEach(select => {
-         const group = select.dataset.groupName;
-         const value = select.value;
-         const price = parseFloat(select.options[select.selectedIndex].dataset.price) || 0;
-         
-         selectionParts.push(`${value}`); // Construct name like "10x10 / Cotton"
-         finalPrice += price;
-      });
-      
-      const variantName = selectionParts.join(' / ');
-      
-      fetch(`${appUrl}/api/process-checkout`, {
-        method: 'POST',
-        mode: 'cors',
-        credentials: 'omit',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: token,
-          draftOrderId: orderData.draftOrderId,
-          variantName: variantName, // Combined name
-          price: finalPrice.toFixed(2), // Calculated total
-          shop: shop
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.checkoutUrl) {
-          window.location.href = data.checkoutUrl;
-        } else {
-          throw new Error(data.error || 'Checkout failed');
-        }
-      })
-      .catch(err => {
-        console.error('Checkout error:', err);
-        document.getElementById('checkout-error').style.display = 'block';
-        document.getElementById('checkout-error').textContent = err.message || 'Failed to process checkout.';
-        button.disabled = false;
-        button.textContent = 'Proceed to Checkout';
-      });
+    })
+    .catch(err => {
+        console.error(err);
+        document.getElementById('order-loading').style.display = 'none';
+        document.getElementById('order-error').style.display = 'block';
+        document.getElementById('error-message').textContent = err.message;
     });
+
+    function renderOrder(data) {
+        document.getElementById('order-loading').style.display = 'none';
+        document.getElementById('order-content').style.display = 'grid';
+
+        // 1. Image
+        const imgEl = document.getElementById('product-image');
+        if (data.productImage) {
+            imgEl.src = data.productImage;
+            imgEl.style.display = 'block';
+        } else {
+            document.querySelector('.product-image-wrapper').innerHTML = '<p>No Image Available</p>';
+        }
+
+        // 2. Title
+        document.getElementById('product-title').textContent = data.productTitle;
+
+        // 3. Option Groups (Dropdowns)
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+
+        if (!data.optionGroups || data.optionGroups.length === 0) {
+            container.innerHTML = '<p style="color:red">No options found. Please recreate the order.</p>';
+            return;
+        }
+
+        data.optionGroups.forEach(group => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'option-group';
+            
+            const label = document.createElement('label');
+            label.className = 'option-label';
+            label.textContent = group.name;
+            
+            const select = document.createElement('select');
+            select.className = 'option-select';
+            select.dataset.group = group.name;
+            
+            group.values.forEach(val => {
+                const opt = document.createElement('option');
+                opt.value = val.label;
+                opt.dataset.price = val.price;
+                opt.textContent = `${val.label} (+$${val.price})`;
+                select.appendChild(opt);
+            });
+
+            select.addEventListener('change', updatePrice);
+            wrapper.appendChild(label);
+            wrapper.appendChild(select);
+            container.appendChild(wrapper);
+        });
+
+        updatePrice();
+    }
+
+    function updatePrice() {
+        let total = 0;
+        document.querySelectorAll('.option-select').forEach(sel => {
+            const opt = sel.options[sel.selectedIndex];
+            total += parseFloat(opt.dataset.price || 0);
+        });
+        document.getElementById('product-price').textContent = '$' + total.toFixed(2);
+    }
+    
+    // Checkout Handler
+    document.getElementById('checkout-button').addEventListener('click', () => {
+        const selects = document.querySelectorAll('.option-select');
+        if(selects.length === 0) return;
+
+        const variantName = Array.from(selects).map(s => s.value).join(' / ');
+        const price = document.getElementById('product-price').textContent.replace('$','');
+
+        fetch(`${appUrl}/api/process-checkout`, {
+            method: 'POST',
+            mode: 'cors',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                token: token,
+                draftOrderId: orderData.draftOrderId,
+                variantName: variantName,
+                price: price,
+                shop: shop
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.checkoutUrl) window.location.href = data.checkoutUrl;
+            else alert('Checkout failed: ' + (data.error || 'Unknown error'));
+        });
+    });
+
   })();
 </script>
 

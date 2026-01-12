@@ -1,14 +1,14 @@
 // app/routes/api.get-order.jsx
 
 export async function loader({ request }) {
-  // 1. Define CORS Headers
+  // 1. CORS Headers (Allow frontend to talk to backend)
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
 
-  // 2. Handle Pre-flight (OPTIONS)
+  // Handle Browser Pre-check
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -17,27 +17,22 @@ export async function loader({ request }) {
   const token = url.searchParams.get("token");
   const shop = url.searchParams.get("shop");
 
-  // Helper to return JSON response with CORS
+  // Helper for JSON response
   const jsonResponse = (data, status = 200) => {
     return new Response(JSON.stringify(data), {
       status,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders,
-      },
+      headers: { "Content-Type": "application/json", ...corsHeaders }
     });
   };
 
   if (!token || !shop) {
-    return jsonResponse({ success: false, message: "Missing token or shop" }, 400);
+    return jsonResponse({ success: false, error: "Missing token or shop" }, 400);
   }
 
   try {
     const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
-    // Note: In production, verify this matches the shop making the request if possible
-    // or rely on the uniqueness of the random token.
 
-    // 3. Fetch Draft Orders from Shopify Admin
+    // 2. Fetch Draft Orders from Shopify
     const response = await fetch(
       `https://${shop}/admin/api/2024-10/draft_orders.json?limit=250`,
       {
@@ -49,37 +44,50 @@ export async function loader({ request }) {
     );
 
     const data = await response.json();
-
-    // 4. Filter for the order with the matching token tag
+    
+    // 3. Find the specific order
     const draftOrder = data.draft_orders?.find((order) =>
       order.tags?.includes(`t_${token}`)
     );
 
     if (!draftOrder) {
-      return jsonResponse({ success: false, message: "Order not found" }, 404);
+      return jsonResponse({ success: false, error: "Order not found" }, 404);
     }
 
-    // 5. Extract Attributes
+    // 4. Extract Data Safely
     const getAttr = (name) => {
       const attr = draftOrder.note_attributes?.find((a) => a.name === name);
       return attr ? attr.value : null;
     };
 
-    const responsePayload = {
+    // Parse Option Groups (The new dropdowns)
+    let optionGroups = [];
+    const rawGroups = getAttr("_option_groups");
+    if (rawGroups) {
+      try {
+        optionGroups = JSON.parse(rawGroups);
+      } catch (e) {
+        console.error("Error parsing option groups:", e);
+      }
+    }
+
+    // Parse Image (Cloudinary URL)
+    const imgUrl = getAttr("_img");
+
+    // 5. Return Data to Frontend
+    return jsonResponse({
       success: true,
       draftOrderId: draftOrder.id,
       productTitle: getAttr("_title") || "Custom Order",
-      productImage: getAttr("_img"),
-      variants: JSON.parse(getAttr("_variants") || "[]"),
+      productImage: imgUrl,      // <--- Frontend looks for this exact name
+      note: draftOrder.note,
+      optionGroups: optionGroups, // <--- Frontend loops through this
       price: draftOrder.total_price,
       currency: draftOrder.currency,
-      note: draftOrder.note,
-    };
-
-    return jsonResponse(responsePayload);
+    });
 
   } catch (error) {
     console.error("API Error:", error);
-    return jsonResponse({ success: false, message: "Server error" }, 500);
+    return jsonResponse({ success: false, error: "Server error" }, 500);
   }
 }
