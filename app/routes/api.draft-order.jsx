@@ -1,4 +1,3 @@
-// app/routes/api.draft-order.jsx
 import { authenticate } from "../shopify.server";
 import crypto from "crypto";
 
@@ -7,69 +6,104 @@ export async function action({ request }) {
 
   try {
     const body = await request.json();
-    const { customerEmail, customerName, productTitle, note, variants, productImage } = body;
+    const { 
+      customerEmail, 
+      customerName, 
+      productTitle, 
+      note, 
+      optionGroups, // Renamed from 'variants' to support new structure
+      productImage,
+      isTemplate,   // New: Check if we are saving a template
+      templateName  // New: Name of the template
+    } = body;
 
-    // Validate required fields
-    if (!customerEmail || !customerName || !productTitle || !variants || variants.length === 0) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: "Missing required fields" 
-      }), { 
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
+    // --- 1. Validation Logic ---
+    if (isTemplate) {
+      // For Templates: We only need Title and Template Name
+      if (!productTitle || !templateName) {
+         return new Response(JSON.stringify({ 
+           success: false, 
+           error: "Template Name and Product Title are required" 
+         }), { 
+           status: 400,
+           headers: { "Content-Type": "application/json" }
+         });
+      }
+    } else {
+      // For Orders: We need Customer Info
+      if (!customerEmail || !customerName || !productTitle || !optionGroups) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: "Missing required fields (Name, Email, Title)" 
+        }), { 
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
     }
 
-    // Generate SHORT unique token (8 characters for tag limit)
+    // --- 2. Data Preparation ---
     const token = crypto.randomBytes(4).toString('hex'); // 8 characters
+    let tags = "";
+    
+    // Clean Option Groups (Ensure numbers are sanitized)
+    const cleanOptionGroups = optionGroups ? optionGroups.map(g => ({
+      name: g.name,
+      values: g.values.map(v => ({
+        id: v.id,
+        label: v.label,
+        price: v.price || "0"
+      }))
+    })) : [];
 
-    // Split customer name
-    const nameParts = customerName.trim().split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(' ') || '';
+    // Note Attributes Setup
+    const noteAttributes = [
+      { name: "_title", value: productTitle },
+      { name: "_img", value: productImage || "" },
+      { name: "_option_groups", value: JSON.stringify(cleanOptionGroups) } // Storing full option structure
+    ];
 
-    // Use the first variant as default for draft order
-    const defaultVariant = variants[0];
+    if (isTemplate) {
+      tags = "app_template";
+      noteAttributes.push({ name: "_template_name", value: templateName });
+    } else {
+      tags = `custom,t_${token}`;
+      noteAttributes.push({ name: "_token", value: token });
+    }
 
-    // Step 1: Create draft order with image URL (much smaller than base64)
-    const draftOrderData = {
-      draft_order: {
-        line_items: [{
-          title: `${productTitle} - ${defaultVariant.name}`,
-          quantity: 1,
-          price: defaultVariant.price,
-          custom: true
-        }],
-        customer: {
-          email: customerEmail,
-          first_name: firstName,
-          last_name: lastName
-        },
-        email: customerEmail,
-        note: note || "",
-        use_customer_default_address: false,
-        tags: `custom,t_${token}`,
-        note_attributes: [
-          {
-            name: "_token",
-            value: token
-          },
-          {
-            name: "_variants",
-            value: JSON.stringify(variants)
-          },
-          {
-            name: "_title",
-            value: productTitle
-          },
-          {
-            name: "_img",
-            value: productImage || "" // Store Cloudinary URL
-          }
-        ]
-      }
+    // Line Items
+    // We set price to 0.00 initially. The final price depends on customer selection on the frontend.
+    const lineItems = [{
+      title: productTitle,
+      quantity: 1,
+      price: "0.00",
+      custom: true
+    }];
+
+    // --- 3. Construct Payload ---
+    const draftOrderPayload = {
+      line_items: lineItems,
+      tags: tags,
+      note: note || "",
+      note_attributes: noteAttributes,
+      use_customer_default_address: false
     };
 
+    // Add Customer (Only for real orders, optional for templates)
+    if (!isTemplate && customerEmail && customerName) {
+      const nameParts = customerName.trim().split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      draftOrderPayload.customer = {
+        email: customerEmail,
+        first_name: firstName,
+        last_name: lastName
+      };
+      draftOrderPayload.email = customerEmail;
+    }
+
+    // --- 4. Call Shopify API ---
     const createResponse = await fetch(
       `https://${session.shop}/admin/api/2024-10/draft_orders.json`,
       {
@@ -78,7 +112,7 @@ export async function action({ request }) {
           'Content-Type': 'application/json',
           'X-Shopify-Access-Token': session.accessToken
         },
-        body: JSON.stringify(draftOrderData)
+        body: JSON.stringify({ draft_order: draftOrderPayload })
       }
     );
 
@@ -97,15 +131,23 @@ export async function action({ request }) {
       });
     }
 
-    const draftOrderId = createResult.draft_order.id;
+    // --- 5. Return Success ---
+    
+    // Scenario A: Template Saved
+    if (isTemplate) {
+      return new Response(JSON.stringify({
+        success: true,
+        isTemplate: true,
+        message: "Template saved successfully"
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
 
-    // Step 2: Generate customer link - now pointing to store page
+    // Scenario B: Order Created (Return Link)
     const customerLink = `https://${session.shop}/pages/custom-order?token=${token}`;
 
-    console.log('Customer Link:', customerLink);
-    console.log('Email should be sent to:', customerEmail);
-
-    // Return success with customer link
     return new Response(JSON.stringify({
       success: true,
       draftOrder: createResult.draft_order,

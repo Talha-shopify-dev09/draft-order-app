@@ -1,7 +1,9 @@
-// app/routes/app._index.jsx
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { json } from "@remix-run/node"; // Added json
+import { useLoaderData } from "@remix-run/react"; // Added useLoaderData
 import {
   Page,
+  Layout,
   Card,
   FormLayout,
   TextField,
@@ -11,16 +13,23 @@ import {
   InlineStack,
   Thumbnail,
   Icon,
+  Select,   // Added
+  Divider,  // Added
+  Box,      // Added
+  Text      // Added
 } from "@shopify/polaris";
-import { DeleteIcon } from "@shopify/polaris-icons";
+import { DeleteIcon, PlusIcon, SaveIcon } from "@shopify/polaris-icons"; // Added Icons
 import { authenticate } from "../shopify.server";
 
+// 1. Updated Loader to return Shop (needed for fetching templates)
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
-  return null;
+  const { session } = await authenticate.admin(request);
+  return json({ shop: session.shop });
 };
 
 export default function Index() {
+  const { shop } = useLoaderData(); // Get shop from loader
+
   const [formData, setFormData] = useState({
     customerEmail: "",
     customerName: "",
@@ -30,34 +39,54 @@ export default function Index() {
     productImagePreview: null,
   });
 
-  const [variants, setVariants] = useState([
-    { id: "1", name: "", price: "" }
+  // 2. REPLACED 'variants' with 'optionGroups' (Complex Structure)
+  const [optionGroups, setOptionGroups] = useState([
+    { 
+      id: Date.now(), 
+      name: "Dimensions", 
+      values: [{ id: Date.now() + 1, label: "", price: "0" }] 
+    }
   ]);
+
+  // 3. ADDED Template State
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [templateName, setTemplateName] = useState("");
+  const [isTemplateSave, setIsTemplateSave] = useState(false); // Track if we are saving a template
 
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [generatedLink, setGeneratedLink] = useState("");
 
+  // 4. Fetch Templates on Load
+  useEffect(() => {
+    if (shop) {
+      fetch(`/api/templates?shop=${shop}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) setTemplates(data.templates);
+        })
+        .catch(console.error);
+    }
+  }, [shop]);
+
   const handleChange = useCallback((field) => (value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   }, []);
 
+  // --- Image Handlers (Kept Same) ---
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         setErrorMessage('Please upload an image file');
         return;
       }
-      
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setErrorMessage('Image size should be less than 5MB');
         return;
       }
-
       setFormData(prev => ({
         ...prev,
         productImage: file,
@@ -77,42 +106,88 @@ export default function Index() {
     }));
   };
 
-  const addVariant = () => {
-    setVariants([...variants, { 
-      id: Date.now().toString(), 
+  // --- 5. NEW Option Group Logic ---
+  
+  // Add a whole new group (e.g., "Materials")
+  const addGroup = () => {
+    setOptionGroups([...optionGroups, { 
+      id: Date.now(), 
       name: "", 
-      price: "" 
+      values: [{ id: Date.now() + 1, label: "", price: "0" }] 
     }]);
   };
 
-  const removeVariant = (id) => {
-    if (variants.length > 1) {
-      setVariants(variants.filter(v => v.id !== id));
+  const removeGroup = (idx) => {
+    const newGroups = [...optionGroups];
+    newGroups.splice(idx, 1);
+    setOptionGroups(newGroups);
+  };
+
+  const updateGroup = (idx, field, val) => {
+    const newGroups = [...optionGroups];
+    newGroups[idx][field] = val;
+    setOptionGroups(newGroups);
+  };
+
+  // Add a value to a group (e.g., "Cotton")
+  const addValueToGroup = (groupIdx) => {
+    const newGroups = [...optionGroups];
+    newGroups[groupIdx].values.push({ id: Date.now(), label: "", price: "0" });
+    setOptionGroups(newGroups);
+  };
+
+  const updateValue = (groupIdx, valIdx, field, val) => {
+    const newGroups = [...optionGroups];
+    newGroups[groupIdx].values[valIdx][field] = val;
+    setOptionGroups(newGroups);
+  };
+
+  const removeValue = (groupIdx, valIdx) => {
+    const newGroups = [...optionGroups];
+    newGroups[groupIdx].values.splice(valIdx, 1);
+    setOptionGroups(newGroups);
+  };
+
+  // --- 6. Template Loading Logic ---
+  const handleLoadTemplate = (templateId) => {
+    const template = templates.find(t => t.id == templateId);
+    if (template) {
+      setFormData(prev => ({
+        ...prev,
+        productTitle: template.productTitle,
+        // We can load image URL if needed, but file input can't be set programmatically easily
+        // If template has image URL, you might need extra logic to show it
+      }));
+      setOptionGroups(template.optionGroups);
+      setSelectedTemplate(templateId);
     }
   };
 
-  const updateVariant = (id, field, value) => {
-    setVariants(variants.map(v => 
-      v.id === id ? { ...v, [field]: value } : v
-    ));
-  };
-
-  const handleSubmit = async () => {
+  // --- 7. Updated Submit Logic ---
+  const handleSubmit = async (saveAsTemplate = false) => {
     setLoading(true);
     setSuccessMessage("");
     setErrorMessage("");
     setGeneratedLink("");
+    setIsTemplateSave(saveAsTemplate);
 
     try {
-      // Validate variants
-      const validVariants = variants.filter(v => v.name && v.price);
-      if (validVariants.length === 0) {
-        setErrorMessage("Please add at least one variant with name and price");
+      // Validate: Ensure groups have names and values
+      const isValid = optionGroups.every(g => g.name && g.values.every(v => v.label));
+      
+      if (!isValid) {
+        setErrorMessage("Please ensure all Option Groups and Values have names.");
         setLoading(false);
         return;
       }
 
-      // Upload image to Cloudinary first
+      if (saveAsTemplate && !templateName) {
+        setErrorMessage("Please enter a name for the template.");
+        setLoading(false);
+        return;
+      }
+
+      // Upload image to Cloudinary (Only if not a template save, or if you want templates to have images)
       let imageUrl = null;
       if (formData.productImage) {
         const imageBase64 = await new Promise((resolve, reject) => {
@@ -122,12 +197,9 @@ export default function Index() {
           reader.readAsDataURL(formData.productImage);
         });
 
-        // Upload to Cloudinary
         const uploadResponse = await fetch("/api/upload-image", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ image: imageBase64 }),
         });
 
@@ -135,280 +207,199 @@ export default function Index() {
         if (uploadData.success) {
           imageUrl = uploadData.imageUrl;
         } else {
-          setErrorMessage("Failed to upload image: " + uploadData.error);
-          setLoading(false);
-          return;
+          throw new Error("Failed to upload image: " + uploadData.error);
         }
       }
 
+      // Prepare Payload
+      const payload = {
+        customerEmail: formData.customerEmail,
+        customerName: formData.customerName,
+        productTitle: formData.productTitle,
+        note: formData.note,
+        optionGroups: optionGroups, // Sending groups instead of flat variants
+        productImage: imageUrl,
+        isTemplate: saveAsTemplate,
+        templateName: saveAsTemplate ? templateName : null
+      };
+
       const response = await fetch("/api/draft-order", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          customerEmail: formData.customerEmail,
-          customerName: formData.customerName,
-          productTitle: formData.productTitle,
-          note: formData.note,
-          variants: validVariants,
-          productImage: imageUrl, // Now it's a URL, not base64
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        setSuccessMessage("Draft order created successfully!");
-        setGeneratedLink(data.customerLink);
-        
-        // Reset form
-        if (formData.productImagePreview) {
-          URL.revokeObjectURL(formData.productImagePreview);
+        if (saveAsTemplate) {
+          setSuccessMessage("Template saved successfully!");
+          // Refresh templates list
+          fetch(`/api/templates?shop=${shop}`)
+            .then(res => res.json())
+            .then(d => d.success && setTemplates(d.templates));
+        } else {
+          setSuccessMessage("Draft order created successfully!");
+          setGeneratedLink(data.customerLink);
         }
-        setFormData({
-          customerEmail: "",
-          customerName: "",
-          productTitle: "",
-          note: "",
-          productImage: null,
-          productImagePreview: null,
-        });
-        setVariants([{ id: "1", name: "", price: "" }]);
       } else {
-        // Make sure we only set string error messages
-        const errorMsg = typeof data.error === 'string' 
-          ? data.error 
-          : JSON.stringify(data.error) || "Failed to create draft order";
-        setErrorMessage(errorMsg);
+        throw new Error(data.error || "Operation failed");
       }
     } catch (error) {
-      const errorMsg = typeof error === 'string' 
-        ? error 
-        : error?.message || "An error occurred. Please try again.";
-      setErrorMessage(errorMsg);
-      console.error("Error:", error);
+      setErrorMessage(error.message || "An error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
-  const isFormValid =
-    formData.customerEmail &&
-    formData.customerName &&
-    formData.productTitle &&
-    variants.some(v => v.name && v.price);
-
   return (
-    <Page title="Create Draft Order">
+    <Page title="Custom Order Builder">
       <BlockStack gap="500">
+        
+        {/* Messages */}
         {successMessage && (
-          <Banner
-            title="Success"
-            tone="success"
-            onDismiss={() => {
-              setSuccessMessage("");
-              setGeneratedLink("");
-            }}
-          >
-            <BlockStack gap="200">
-              <p>{successMessage}</p>
-              {generatedLink && (
-                <div>
-                  <p style={{ marginBottom: "8px" }}>
-                    <strong>Customer Link:</strong>
-                  </p>
-                  <div style={{ 
-                    padding: "10px", 
-                    backgroundColor: "#f0f2ff", 
-                    borderRadius: "4px",
-                    wordBreak: "break-all"
-                  }}>
-                    <a 
-                      href={generatedLink} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      style={{ color: "#5469d4" }}
-                    >
-                      {generatedLink}
-                    </a>
-                  </div>
-                  <p style={{ marginTop: "8px", fontSize: "13px", color: "#666" }}>
-                    Copy this link and send it to your customer via email
-                  </p>
-                </div>
-              )}
-            </BlockStack>
+          <Banner title="Success" tone="success" onDismiss={() => setSuccessMessage("")}>
+            <p>{successMessage}</p>
+            {generatedLink && (
+              <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                <p><strong>Customer Link:</strong> <a href={generatedLink} target="_blank">{generatedLink}</a></p>
+              </Box>
+            )}
           </Banner>
         )}
-
         {errorMessage && (
-          <Banner
-            title="Error"
-            tone="critical"
-            onDismiss={() => setErrorMessage("")}
-          >
+          <Banner title="Error" tone="critical" onDismiss={() => setErrorMessage("")}>
             <p>{errorMessage}</p>
           </Banner>
         )}
 
+        {/* 8. NEW Template Selection Card */}
         <Card>
           <BlockStack gap="400">
-            <p>Create a custom draft order with variants and send a selection link to your customer.</p>
+            <Text variant="headingMd" as="h2">Templates</Text>
+            <InlineStack gap="400">
+               <div style={{flex: 1}}>
+                 <Select
+                   label="Load Saved Template"
+                   options={[{label: "Select a template...", value: ""}, ...templates.map(t => ({label: t.name, value: t.id}))]}
+                   value={selectedTemplate}
+                   onChange={handleLoadTemplate}
+                 />
+               </div>
+            </InlineStack>
+          </BlockStack>
+        </Card>
 
+        <Card>
+          <BlockStack gap="400">
+            <Text variant="headingLg" as="h1">Order Details</Text>
             <FormLayout>
-              {/* Customer Information */}
+              
+              {/* Product Info */}
+              <TextField
+                label="Product Title"
+                value={formData.productTitle}
+                onChange={handleChange("productTitle")}
+                autoComplete="off"
+              />
+
+              {/* Customer Info */}
               <FormLayout.Group>
                 <TextField
                   label="Customer Name"
                   value={formData.customerName}
                   onChange={handleChange("customerName")}
-                  placeholder="John Doe"
                   autoComplete="off"
-                  requiredIndicator
                 />
                 <TextField
                   label="Customer Email"
                   type="email"
                   value={formData.customerEmail}
                   onChange={handleChange("customerEmail")}
-                  placeholder="customer@example.com"
                   autoComplete="email"
-                  requiredIndicator
                 />
               </FormLayout.Group>
 
-              {/* Product Information */}
-              <TextField
-                label="Product Title"
-                value={formData.productTitle}
-                onChange={handleChange("productTitle")}
-                placeholder="Custom Product Name"
-                autoComplete="off"
-                requiredIndicator
-              />
-
               {/* Image Upload */}
               <div>
-                <label style={{ 
-                  display: "block", 
-                  marginBottom: "8px",
-                  fontWeight: 500,
-                  fontSize: "14px"
-                }}>
-                  Product Image
-                </label>
-                
+                <p style={{marginBottom: '8px', fontWeight: 500}}>Product Image</p>
                 {formData.productImagePreview ? (
                   <BlockStack gap="300">
-                    <Thumbnail
-                      source={formData.productImagePreview}
-                      alt={formData.productTitle}
-                      size="large"
-                    />
-                    <InlineStack align="start">
-                      <Button onClick={removeImage} icon={DeleteIcon}>
-                        Remove Image
-                      </Button>
-                    </InlineStack>
+                    <Thumbnail source={formData.productImagePreview} alt="Preview" size="large" />
+                    <Button onClick={removeImage} icon={DeleteIcon}>Remove Image</Button>
                   </BlockStack>
                 ) : (
-                  <div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      style={{ display: "none" }}
-                      id="image-upload"
-                    />
-                    <label htmlFor="image-upload">
-                      <Button onClick={() => document.getElementById('image-upload').click()}>
-                        Upload Image
-                      </Button>
-                    </label>
-                  </div>
+                  <input type="file" accept="image/*" onChange={handleImageUpload} />
                 )}
               </div>
 
-              {/* Variants Section */}
-              <div>
-                <BlockStack gap="300">
-                  <div style={{ 
-                    display: "flex", 
-                    justifyContent: "space-between",
-                    alignItems: "center"
-                  }}>
-                    <label style={{ 
-                      fontWeight: 500,
-                      fontSize: "14px"
-                    }}>
-                      Product Variants
-                    </label>
-                    <Button onClick={addVariant} size="slim">
-                      Add Variant
-                    </Button>
-                  </div>
+              <Divider />
 
-                  {variants.map((variant, index) => (
-                    <Card key={variant.id}>
-                      <BlockStack gap="300">
-                        <FormLayout>
-                          <FormLayout.Group>
-                            <TextField
-                              label="Variant Name"
-                              value={variant.name}
-                              onChange={(value) => updateVariant(variant.id, "name", value)}
-                              placeholder="e.g., Small, Red, Basic"
-                              autoComplete="off"
-                            />
-                            <TextField
-                              label="Price"
-                              type="number"
-                              value={variant.price}
-                              onChange={(value) => updateVariant(variant.id, "price", value)}
-                              placeholder="0.00"
-                              prefix="$"
-                              autoComplete="off"
-                            />
-                          </FormLayout.Group>
-                        </FormLayout>
-                        {variants.length > 1 && (
-                          <InlineStack align="start">
-                            <Button 
-                              onClick={() => removeVariant(variant.id)}
-                              tone="critical"
-                              size="slim"
-                            >
-                              Remove
-                            </Button>
-                          </InlineStack>
-                        )}
-                      </BlockStack>
-                    </Card>
-                  ))}
-                </BlockStack>
-              </div>
+              {/* 9. NEW Option Group Builder UI */}
+              <Text variant="headingMd" as="h2">Variant Options</Text>
+              
+              {optionGroups.map((group, groupIdx) => (
+                <div key={group.id} style={{background: '#f7f7f7', padding: '15px', borderRadius: '8px', border: '1px solid #e1e3e5'}}>
+                  <BlockStack gap="300">
+                    <InlineStack align="space-between">
+                       <div style={{width: '70%'}}>
+                         <TextField 
+                           label="Option Name (e.g. Dimensions)" 
+                           value={group.name} 
+                           onChange={(v) => updateGroup(groupIdx, 'name', v)} 
+                           autoComplete="off"
+                         />
+                       </div>
+                       <Button icon={DeleteIcon} tone="critical" onClick={() => removeGroup(groupIdx)}>Remove Group</Button>
+                    </InlineStack>
+
+                    <Text variant="bodySm" as="p" fontWeight="bold">Values</Text>
+                    {group.values.map((val, valIdx) => (
+                      <InlineStack key={val.id} gap="300" align="center">
+                        <div style={{flex: 2}}>
+                           <TextField placeholder="Label (e.g. 10x10)" value={val.label} onChange={(v) => updateValue(groupIdx, valIdx, 'label', v)} autoComplete="off" />
+                        </div>
+                        <div style={{flex: 1}}>
+                           <TextField type="number" prefix="$" placeholder="Price" value={val.price} onChange={(v) => updateValue(groupIdx, valIdx, 'price', v)} autoComplete="off" />
+                        </div>
+                        <Button icon={DeleteIcon} onClick={() => removeValue(groupIdx, valIdx)} />
+                      </InlineStack>
+                    ))}
+                    <div style={{marginTop: '5px'}}>
+                      <Button variant="plain" icon={PlusIcon} onClick={() => addValueToGroup(groupIdx)}>Add Value</Button>
+                    </div>
+                  </BlockStack>
+                </div>
+              ))}
+              
+              <Button onClick={addGroup} variant="secondary" icon={PlusIcon}>Add New Option Group</Button>
+
+              <Divider />
 
               {/* Note */}
               <TextField
-                label="Note to Customer (Optional)"
+                label="Note to Customer"
                 value={formData.note}
                 onChange={handleChange("note")}
-                multiline={4}
-                placeholder="Add a personalized message..."
-                autoComplete="off"
+                multiline={3}
               />
 
-              <InlineStack align="start">
-                <Button
-                  variant="primary"
-                  loading={loading}
-                  onClick={handleSubmit}
-                  disabled={!isFormValid}
-                >
-                  Create Draft Order & Send Link
-                </Button>
+              <Divider />
+
+              {/* 10. Action Buttons (Save Template vs Create Link) */}
+              <InlineStack align="space-between" gap="400">
+                 <InlineStack gap="200">
+                    <div style={{width: '200px'}}>
+                      <TextField placeholder="Template Name" value={templateName} onChange={setTemplateName} autoComplete="off" />
+                    </div>
+                    <Button icon={SaveIcon} onClick={() => handleSubmit(true)} loading={loading && isTemplateSave}>Save as Template</Button>
+                 </InlineStack>
+
+                 <Button variant="primary" size="large" onClick={() => handleSubmit(false)} loading={loading && !isTemplateSave}>
+                    Create Customer Link
+                 </Button>
               </InlineStack>
+
             </FormLayout>
           </BlockStack>
         </Card>
