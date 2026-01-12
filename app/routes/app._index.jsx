@@ -1,9 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
-import { json } from "@remix-run/node"; // Added json
-import { useLoaderData } from "@remix-run/react"; // Added useLoaderData
+import { useLoaderData, useFetcher } from "react-router"; // FIXED IMPORT
 import {
   Page,
-  Layout,
   Card,
   FormLayout,
   TextField,
@@ -12,23 +10,23 @@ import {
   BlockStack,
   InlineStack,
   Thumbnail,
-  Icon,
-  Select,   // Added
-  Divider,  // Added
-  Box,      // Added
-  Text      // Added
+  Select,
+  Divider,
+  Box,
+  Text
 } from "@shopify/polaris";
-import { DeleteIcon, PlusIcon, SaveIcon } from "@shopify/polaris-icons"; // Added Icons
+import { DeleteIcon, PlusIcon, SaveIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 
-// 1. Updated Loader to return Shop (needed for fetching templates)
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  return json({ shop: session.shop });
+  // Return plain object in React Router v7
+  return { shop: session.shop };
 };
 
 export default function Index() {
-  const { shop } = useLoaderData(); // Get shop from loader
+  const { shop } = useLoaderData(); 
+  const fetcher = useFetcher();
 
   const [formData, setFormData] = useState({
     customerEmail: "",
@@ -39,7 +37,6 @@ export default function Index() {
     productImagePreview: null,
   });
 
-  // 2. REPLACED 'variants' with 'optionGroups' (Complex Structure)
   const [optionGroups, setOptionGroups] = useState([
     { 
       id: Date.now(), 
@@ -48,18 +45,17 @@ export default function Index() {
     }
   ]);
 
-  // 3. ADDED Template State
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [templateName, setTemplateName] = useState("");
-  const [isTemplateSave, setIsTemplateSave] = useState(false); // Track if we are saving a template
+  const [isTemplateSave, setIsTemplateSave] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [generatedLink, setGeneratedLink] = useState("");
 
-  // 4. Fetch Templates on Load
+  // Fetch Templates on Load
   useEffect(() => {
     if (shop) {
       fetch(`/api/templates?shop=${shop}`)
@@ -75,7 +71,7 @@ export default function Index() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   }, []);
 
-  // --- Image Handlers (Kept Same) ---
+  // --- Image Handlers ---
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -106,9 +102,7 @@ export default function Index() {
     }));
   };
 
-  // --- 5. NEW Option Group Logic ---
-  
-  // Add a whole new group (e.g., "Materials")
+  // --- Option Group Logic ---
   const addGroup = () => {
     setOptionGroups([...optionGroups, { 
       id: Date.now(), 
@@ -129,7 +123,6 @@ export default function Index() {
     setOptionGroups(newGroups);
   };
 
-  // Add a value to a group (e.g., "Cotton")
   const addValueToGroup = (groupIdx) => {
     const newGroups = [...optionGroups];
     newGroups[groupIdx].values.push({ id: Date.now(), label: "", price: "0" });
@@ -148,22 +141,20 @@ export default function Index() {
     setOptionGroups(newGroups);
   };
 
-  // --- 6. Template Loading Logic ---
+  // --- Template Loading Logic ---
   const handleLoadTemplate = (templateId) => {
     const template = templates.find(t => t.id == templateId);
     if (template) {
       setFormData(prev => ({
         ...prev,
-        productTitle: template.productTitle,
-        // We can load image URL if needed, but file input can't be set programmatically easily
-        // If template has image URL, you might need extra logic to show it
+        productTitle: template.productTitle || "",
       }));
-      setOptionGroups(template.optionGroups);
+      setOptionGroups(template.optionGroups || []);
       setSelectedTemplate(templateId);
     }
   };
 
-  // --- 7. Updated Submit Logic ---
+  // --- Submit Logic ---
   const handleSubmit = async (saveAsTemplate = false) => {
     setLoading(true);
     setSuccessMessage("");
@@ -172,7 +163,6 @@ export default function Index() {
     setIsTemplateSave(saveAsTemplate);
 
     try {
-      // Validate: Ensure groups have names and values
       const isValid = optionGroups.every(g => g.name && g.values.every(v => v.label));
       
       if (!isValid) {
@@ -187,7 +177,7 @@ export default function Index() {
         return;
       }
 
-      // Upload image to Cloudinary (Only if not a template save, or if you want templates to have images)
+      // Upload image to Cloudinary
       let imageUrl = null;
       if (formData.productImage) {
         const imageBase64 = await new Promise((resolve, reject) => {
@@ -211,13 +201,12 @@ export default function Index() {
         }
       }
 
-      // Prepare Payload
       const payload = {
         customerEmail: formData.customerEmail,
         customerName: formData.customerName,
         productTitle: formData.productTitle,
         note: formData.note,
-        optionGroups: optionGroups, // Sending groups instead of flat variants
+        optionGroups: optionGroups,
         productImage: imageUrl,
         isTemplate: saveAsTemplate,
         templateName: saveAsTemplate ? templateName : null
@@ -234,7 +223,6 @@ export default function Index() {
       if (data.success) {
         if (saveAsTemplate) {
           setSuccessMessage("Template saved successfully!");
-          // Refresh templates list
           fetch(`/api/templates?shop=${shop}`)
             .then(res => res.json())
             .then(d => d.success && setTemplates(d.templates));
@@ -262,7 +250,7 @@ export default function Index() {
             <p>{successMessage}</p>
             {generatedLink && (
               <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                <p><strong>Customer Link:</strong> <a href={generatedLink} target="_blank">{generatedLink}</a></p>
+                <p><strong>Customer Link:</strong> <a href={generatedLink} target="_blank" rel="noreferrer">{generatedLink}</a></p>
               </Box>
             )}
           </Banner>
@@ -273,7 +261,7 @@ export default function Index() {
           </Banner>
         )}
 
-        {/* 8. NEW Template Selection Card */}
+        {/* Template Selection */}
         <Card>
           <BlockStack gap="400">
             <Text variant="headingMd" as="h2">Templates</Text>
@@ -295,7 +283,6 @@ export default function Index() {
             <Text variant="headingLg" as="h1">Order Details</Text>
             <FormLayout>
               
-              {/* Product Info */}
               <TextField
                 label="Product Title"
                 value={formData.productTitle}
@@ -303,7 +290,6 @@ export default function Index() {
                 autoComplete="off"
               />
 
-              {/* Customer Info */}
               <FormLayout.Group>
                 <TextField
                   label="Customer Name"
@@ -320,7 +306,6 @@ export default function Index() {
                 />
               </FormLayout.Group>
 
-              {/* Image Upload */}
               <div>
                 <p style={{marginBottom: '8px', fontWeight: 500}}>Product Image</p>
                 {formData.productImagePreview ? (
@@ -335,7 +320,7 @@ export default function Index() {
 
               <Divider />
 
-              {/* 9. NEW Option Group Builder UI */}
+              {/* Option Group Builder */}
               <Text variant="headingMd" as="h2">Variant Options</Text>
               
               {optionGroups.map((group, groupIdx) => (
@@ -376,7 +361,6 @@ export default function Index() {
 
               <Divider />
 
-              {/* Note */}
               <TextField
                 label="Note to Customer"
                 value={formData.note}
@@ -386,7 +370,7 @@ export default function Index() {
 
               <Divider />
 
-              {/* 10. Action Buttons (Save Template vs Create Link) */}
+              {/* Action Buttons */}
               <InlineStack align="space-between" gap="400">
                  <InlineStack gap="200">
                     <div style={{width: '200px'}}>

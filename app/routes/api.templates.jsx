@@ -1,11 +1,19 @@
-import { json } from "@remix-run/node";
+import { authenticate } from "../shopify.server";
 
 export async function loader({ request }) {
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
-  const accessToken = process.env.SHOPIFY_ACCESS_TOKEN; // Ensure this is set in Render env
+  const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
 
-  if (!shop) return json({ success: false, message: "Missing shop" }, 400);
+  // Helper to create JSON responses
+  const jsonResponse = (data, status = 200) => {
+    return new Response(JSON.stringify(data), {
+      status,
+      headers: { "Content-Type": "application/json" }
+    });
+  };
+
+  if (!shop) return jsonResponse({ success: false, message: "Missing shop" }, 400);
 
   try {
     // Fetch all draft orders tagged with 'app_template'
@@ -23,10 +31,14 @@ export async function loader({ request }) {
     
     // Filter purely for our templates
     const templates = (data.draft_orders || [])
-      .filter(order => order.tags.includes('app_template'))
+      .filter(order => order.tags && order.tags.includes('app_template'))
       .map(t => {
         // Parse the stored data
-        const getAttr = (name) => t.note_attributes.find(a => a.name === name)?.value;
+        const getAttr = (name) => {
+            const attr = t.note_attributes?.find(a => a.name === name);
+            return attr ? attr.value : null;
+        };
+
         return {
           id: t.id,
           name: getAttr('_template_name') || t.line_items[0]?.title || "Untitled Template",
@@ -36,10 +48,10 @@ export async function loader({ request }) {
         };
       });
 
-    return json({ success: true, templates });
+    return jsonResponse({ success: true, templates });
 
   } catch (error) {
     console.error("Template Fetch Error:", error);
-    return json({ success: false, message: error.message }, 500);
+    return jsonResponse({ success: false, message: error.message }, 500);
   }
 }
