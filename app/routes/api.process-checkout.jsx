@@ -1,114 +1,72 @@
 // app/routes/api.process-checkout.jsx
-import { authenticate } from "../shopify.server";
 
 export async function action({ request }) {
+  // 1. Define CORS Headers
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
+  // 2. Handle Pre-flight
+  if (request.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  // Helper for JSON response
+  const jsonResponse = (data, status = 200) => {
+    return new Response(JSON.stringify(data), {
+      status,
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders,
+      },
+    });
+  };
+
   try {
     const body = await request.json();
-    const { token, draftOrderId, variantName, price } = body;
+    const { token, draftOrderId, variantName, price, shop } = body;
+    const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
 
-    if (!token || !draftOrderId) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: "Missing required parameters"
-      }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Authenticate with public app proxy
-    const { admin, session } = await authenticate.public.appProxy(request);
-
-    // Update draft order with selected variant
+    // 3. Update the Draft Order in Shopify
     const updateResponse = await fetch(
-      `https://${session.shop}/admin/api/2024-10/draft_orders/${draftOrderId}.json`,
+      `https://${shop}/admin/api/2024-10/draft_orders/${draftOrderId}.json`,
       {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': session.accessToken
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           draft_order: {
-            line_items: [{
-              title: `${variantName}`,
-              quantity: 1,
-              price: price,
-              custom: true
-            }]
-          }
-        })
+            line_items: [
+              {
+                title: variantName,
+                price: price,
+                quantity: 1,
+                custom: true, // Custom item
+              },
+            ],
+          },
+        }),
       }
     );
 
-    const updateResult = await updateResponse.json();
+    const updateData = await updateResponse.json();
 
     if (!updateResponse.ok) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: "Failed to update order"
-      }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
+      throw new Error(JSON.stringify(updateData));
     }
 
-    // Complete the draft order to get invoice URL
-    const completeResponse = await fetch(
-      `https://${session.shop}/admin/api/2024-10/draft_orders/${draftOrderId}/complete.json`,
-      {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': session.accessToken
-        },
-        body: JSON.stringify({
-          payment_pending: true
-        })
-      }
-    );
-
-    const completeResult = await completeResponse.json();
-
-    if (!completeResponse.ok) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: "Failed to complete order"
-      }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Get the order checkout URL
-    const order = completeResult.draft_order;
-    const checkoutUrl = order.invoice_url || `https://${session.shop}/cart`;
-
-    return new Response(JSON.stringify({
+    // 4. Return the invoice URL (Checkout Link)
+    return jsonResponse({
       success: true,
-      checkoutUrl: checkoutUrl
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
+      checkoutUrl: updateData.draft_order.invoice_url,
     });
 
   } catch (error) {
-    console.error("Checkout error:", error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message || "Checkout failed"
-    }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    console.error("Checkout Error:", error);
+    return jsonResponse({ success: false, error: error.message }, 500);
   }
-}
-
-export async function loader() {
-  return new Response(JSON.stringify({ 
-    error: "Method not allowed" 
-  }), { 
-    status: 405,
-    headers: { "Content-Type": "application/json" }
-  });
 }
