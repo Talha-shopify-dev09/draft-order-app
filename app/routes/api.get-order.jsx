@@ -1,31 +1,34 @@
-// app/routes/api.get-order.jsx
+import { json } from "@remix-run/node";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
 
 export async function loader({ request }) {
+  // 1. HANDLE PRE-FLIGHT (OPTIONS) REQUESTS
+  if (request.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   const url = new URL(request.url);
   const token = url.searchParams.get('token');
   const shop = url.searchParams.get('shop');
 
   if (!token || !shop) {
-    return new Response(JSON.stringify({
-      success: false,
-      error: "Token and shop are required"
-    }), {
-      status: 400,
-      headers: { 
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
-      }
+    return json({ success: false, error: "Token and shop are required" }, { 
+        status: 400, 
+        headers: corsHeaders 
     });
   }
 
   try {
     const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
-    
-    if (!accessToken) {
-      throw new Error("Shopify access token not configured");
-    }
+    // Fallback if the token is missing in .env
+    if (!accessToken) throw new Error("Server Misconfiguration: Access Token missing");
 
-    // Search for draft order by shortened token tag
+    // Fetch from Shopify Admin
     const response = await fetch(
       `https://${shop}/admin/api/2024-10/draft_orders.json?limit=250`,
       {
@@ -37,73 +40,60 @@ export async function loader({ request }) {
     );
 
     const data = await response.json();
+    
+    if (!data.draft_orders) {
+        // If Shopify returns an error (like invalid permissions)
+        console.error("Shopify Error:", data);
+        throw new Error("Failed to fetch draft orders from Shopify");
+    }
 
-    // Find draft order with matching token tag
-    const draftOrder = data.draft_orders?.find(order => 
-      order.tags?.includes(`t_${token}`)
+    const draftOrder = data.draft_orders.find(order => 
+      order.tags && order.tags.includes(`t_${token}`)
     );
 
     if (!draftOrder) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: "Order not found"
-      }), {
-        status: 404,
-        headers: { 
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*"
-        }
+      return json({ success: false, error: "Order not found" }, { 
+          status: 404, 
+          headers: corsHeaders 
       });
     }
 
-    // Extract data from note_attributes
-    const noteAttributes = draftOrder.note_attributes || [];
+    // Extract note_attributes
     const getAttr = (name) => {
-      const attr = noteAttributes.find(a => a.name === name);
+      const attr = (draftOrder.note_attributes || []).find(a => a.name === name);
       return attr ? attr.value : null;
     };
 
     const variantsJson = getAttr('_variants');
-    const productTitle = getAttr('_title') || draftOrder.line_items[0]?.title || 'Product';
-    const productImage = getAttr('_img') || null;
-
+    const productTitle = getAttr('_title') || "Custom Order";
+    const productImage = getAttr('_img') || "";
+    
     let variants = [];
-    if (variantsJson) {
-      try {
-        variants = JSON.parse(variantsJson);
-      } catch (e) {
-        console.error('Failed to parse variants:', e);
-      }
+    try {
+        variants = variantsJson ? JSON.parse(variantsJson) : [];
+    } catch (e) {
+        console.error("JSON Parse Error:", e);
     }
 
-    return new Response(JSON.stringify({
+    return json({
       success: true,
       draftOrderId: draftOrder.id,
-      productTitle: productTitle,
-      productImage: productImage,
+      productTitle,
+      productImage,
       note: draftOrder.note || '',
-      variants: variants,
+      variants,
       customerEmail: draftOrder.email,
-      shop: shop
-    }), {
-      status: 200,
-      headers: { 
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
-      }
+      shop
+    }, { 
+        status: 200, 
+        headers: corsHeaders 
     });
 
   } catch (error) {
-    console.error('Error fetching order:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message || "Failed to fetch order"
-    }), {
-      status: 500,
-      headers: { 
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
-      }
+    console.error('Server Error:', error);
+    return json({ success: false, error: error.message }, { 
+        status: 500, 
+        headers: corsHeaders 
     });
   }
 }
