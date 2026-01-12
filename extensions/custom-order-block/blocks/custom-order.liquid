@@ -310,6 +310,8 @@
       
       fetch(`${appUrl}/api/process-checkout`, {
         method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
         headers: {
           'Content-Type': 'application/json',
         },

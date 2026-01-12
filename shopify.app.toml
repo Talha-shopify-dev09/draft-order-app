@@ -32,8 +32,3 @@ redirect_urls = [
   "https://draft-order-app-rk3s.onrender.com/auth/shopify/callback",
   "https://draft-order-app-rk3s.onrender.com/api/auth/callback"
 ]
-
-[app_proxy]
-url = "https://draft-order-app-rk3s.onrender.com"
-subpath = "draft-order-proxy"
-prefix = "apps"
