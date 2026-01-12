@@ -1,19 +1,19 @@
 // app/routes/api.process-checkout.jsx
 
 export async function action({ request }) {
-  // 1. Define CORS Headers
+  // 1. Define CORS Headers (Critical for "Failed to fetch" fix)
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
 
-  // 2. Handle Pre-flight
+  // 2. Handle Pre-flight (Browser asking permission)
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Helper for JSON response
+  // Helper for clean JSON responses
   const jsonResponse = (data, status = 200) => {
     return new Response(JSON.stringify(data), {
       status,
@@ -28,6 +28,10 @@ export async function action({ request }) {
     const body = await request.json();
     const { token, draftOrderId, variantName, price, shop } = body;
     const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+
+    if (!draftOrderId || !shop) {
+        return jsonResponse({ success: false, error: "Missing order ID" }, 400);
+    }
 
     // 3. Update the Draft Order in Shopify
     const updateResponse = await fetch(
@@ -45,7 +49,8 @@ export async function action({ request }) {
                 title: variantName,
                 price: price,
                 quantity: 1,
-                custom: true, // Custom item
+                custom: true, 
+                taxable: false // Optional: adjust based on needs
               },
             ],
           },
@@ -56,10 +61,11 @@ export async function action({ request }) {
     const updateData = await updateResponse.json();
 
     if (!updateResponse.ok) {
+      console.error("Shopify Update Failed:", updateData);
       throw new Error(JSON.stringify(updateData));
     }
 
-    // 4. Return the invoice URL (Checkout Link)
+    // 4. Return the invoice URL
     return jsonResponse({
       success: true,
       checkoutUrl: updateData.draft_order.invoice_url,
@@ -67,6 +73,6 @@ export async function action({ request }) {
 
   } catch (error) {
     console.error("Checkout Error:", error);
-    return jsonResponse({ success: false, error: error.message }, 500);
+    return jsonResponse({ success: false, error: "Server error processing checkout" }, 500);
   }
 }
