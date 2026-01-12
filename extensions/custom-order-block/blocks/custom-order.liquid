@@ -1,0 +1,341 @@
+{% comment %}
+  Custom Order Block
+  Displays product with variants for custom orders
+{% endcomment %}
+
+<div class="custom-order-block" id="custom-order-{{ section.id }}">
+  <div class="custom-order-container">
+    <div id="order-loading" class="order-loading">
+      <p>Loading your order...</p>
+    </div>
+    
+    <div id="order-error" class="order-error" style="display: none;">
+      <h2>Order Not Found</h2>
+      <p id="error-message"></p>
+    </div>
+    
+    <div id="order-content" class="order-content" style="display: none;">
+      <div class="product-image-wrapper">
+        <img id="product-image" src="" alt="" class="product-image" style="display: none;">
+      </div>
+      
+      <div class="product-details">
+        <h1 id="product-title" class="product-title"></h1>
+        <p id="product-note" class="product-note"></p>
+        
+        <div class="variant-selector">
+          <label class="variant-label">Select Option:</label>
+          <div id="variant-buttons" class="variant-buttons"></div>
+        </div>
+        
+        <div class="price-display">
+          <span id="product-price" class="product-price">$0.00</span>
+        </div>
+        
+        <div id="checkout-error" class="checkout-error" style="display: none;"></div>
+        
+        <button id="checkout-button" class="checkout-button">
+          Proceed to Checkout
+        </button>
+        
+        <p class="secure-notice">🔒 Secure checkout</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .custom-order-block {
+    max-width: 1200px;
+    margin: 50px auto;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  
+  .custom-order-container {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+  }
+  
+  .order-loading, .order-error {
+    padding: 60px 20px;
+    text-align: center;
+  }
+  
+  .order-error {
+    background: #fee;
+    color: #c33;
+  }
+  
+  .order-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    padding: 40px;
+  }
+  
+  @media (max-width: 768px) {
+    .order-content {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .product-image-wrapper {
+    min-height: 400px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .product-image {
+    width: 100%;
+    max-height: 500px;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+  
+  .product-title {
+    font-size: 32px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #333;
+  }
+  
+  .product-note {
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 30px;
+  }
+  
+  .variant-selector {
+    margin-bottom: 25px;
+  }
+  
+  .variant-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #333;
+  }
+  
+  .variant-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  
+  .variant-button {
+    padding: 12px 24px;
+    border: 2px solid #ddd;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  
+  .variant-button:hover {
+    border-color: #999;
+  }
+  
+  .variant-button.active {
+    border-color: #5469d4;
+    background: #f0f2ff;
+    color: #5469d4;
+  }
+  
+  .price-display {
+    margin-bottom: 30px;
+  }
+  
+  .product-price {
+    font-size: 36px;
+    font-weight: bold;
+    color: #333;
+  }
+  
+  .checkout-error {
+    padding: 12px;
+    background: #fee;
+    color: #c33;
+    border-radius: 6px;
+    margin-bottom: 20px;
+  }
+  
+  .checkout-button {
+    width: 100%;
+    padding: 18px;
+    background: #5469d4;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  
+  .checkout-button:hover {
+    background: #4158d0;
+  }
+  
+  .checkout-button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .secure-notice {
+    text-align: center;
+    color: #999;
+    font-size: 12px;
+    margin-top: 15px;
+  }
+</style>
+
+<script>
+  (function() {
+    // Get token from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const shop = '{{ shop.permanent_domain }}';
+    
+    if (!token) {
+      showError('No order token provided');
+      return;
+    }
+    
+    let orderData = null;
+    let selectedVariant = null;
+    
+    // Update this with your current tunnel URL
+    const appUrl = 'https://influence-choir-walked-favour.trycloudflare.com/';
+    
+    // Fetch order data
+    fetch(`${appUrl}/api/get-order?token=${token}&shop=${shop}`)
+      .then(res => res.json())
+      .then(data => {
+        console.log('Order data:', data);
+        if (data.success) {
+          orderData = data;
+          renderOrder(data);
+        } else {
+          showError(data.error || 'Order not found');
+        }
+      })
+      .catch(err => {
+        console.error('Fetch error:', err);
+        showError('Failed to load order');
+      });
+    
+    function renderOrder(data) {
+      document.getElementById('order-loading').style.display = 'none';
+      document.getElementById('order-content').style.display = 'grid';
+      
+      // Set product image
+      if (data.productImage && data.productImage.length > 0) {
+        const imgEl = document.getElementById('product-image');
+        imgEl.src = data.productImage;
+        imgEl.alt = data.productTitle;
+        imgEl.style.display = 'block';
+        imgEl.onerror = function() {
+          console.error('Image failed to load');
+          this.style.display = 'none';
+        };
+      } else {
+        document.querySelector('.product-image-wrapper').innerHTML = '<p style="color: #999;">No image available</p>';
+      }
+      
+      // Set product title
+      document.getElementById('product-title').textContent = data.productTitle;
+      
+      // Set note
+      if (data.note) {
+        document.getElementById('product-note').textContent = data.note;
+      }
+      
+      // Render variants
+      const variantButtons = document.getElementById('variant-buttons');
+      data.variants.forEach((variant, index) => {
+        const button = document.createElement('button');
+        button.className = 'variant-button';
+        button.textContent = variant.name;
+        button.onclick = () => selectVariant(variant, button);
+        variantButtons.appendChild(button);
+        
+        if (index === 0) {
+          selectVariant(variant, button);
+        }
+      });
+    }
+    
+    function selectVariant(variant, button) {
+      selectedVariant = variant;
+      
+      // Update active state
+      document.querySelectorAll('.variant-button').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      button.classList.add('active');
+      
+      // Update price
+      document.getElementById('product-price').textContent = `$${variant.price}`;
+    }
+    
+    function showError(message) {
+      document.getElementById('order-loading').style.display = 'none';
+      document.getElementById('order-error').style.display = 'block';
+      document.getElementById('error-message').textContent = message;
+    }
+    
+    // Checkout handler
+    document.getElementById('checkout-button').addEventListener('click', function() {
+      if (!selectedVariant || !orderData) return;
+      
+      const button = this;
+      button.disabled = true;
+      button.textContent = 'Processing...';
+      
+      fetch(`${appUrl}/api/process-checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token: token,
+          draftOrderId: orderData.draftOrderId,
+          variantName: selectedVariant.name,
+          price: selectedVariant.price,
+          shop: shop
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.checkoutUrl) {
+          window.location.href = data.checkoutUrl;
+        } else {
+          throw new Error(data.error || 'Checkout failed');
+        }
+      })
+      .catch(err => {
+        console.error('Checkout error:', err);
+        document.getElementById('checkout-error').style.display = 'block';
+        document.getElementById('checkout-error').textContent = err.message || 'Failed to process checkout. Please try again.';
+        button.disabled = false;
+        button.textContent = 'Proceed to Checkout';
+      });
+    });
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Custom Order Block",
+  "target": "section",
+  "settings": []
+}
+{% endschema %}
