@@ -1,7 +1,10 @@
-import { authenticate } from "../shopify.server";
-import crypto from "crypto";
+// app/routes/api.draft-order.jsx
+import crypto from "crypto"; // Native Node modules are fine to keep at top
 
 export async function action({ request }) {
+  // DYNAMIC IMPORT: Fixes build error
+  const { authenticate } = await import("../shopify.server");
+  
   const { admin, session } = await authenticate.admin(request);
 
   try {
@@ -11,42 +14,27 @@ export async function action({ request }) {
       customerName, 
       productTitle, 
       note, 
-      optionGroups, // Renamed from 'variants' to support new structure
+      optionGroups,
       productImage,
-      isTemplate,   // New: Check if we are saving a template
-      templateName  // New: Name of the template
+      isTemplate,
+      templateName 
     } = body;
 
-    // --- 1. Validation Logic ---
+    // Validation
     if (isTemplate) {
-      // For Templates: We only need Title and Template Name
       if (!productTitle || !templateName) {
-         return new Response(JSON.stringify({ 
-           success: false, 
-           error: "Template Name and Product Title are required" 
-         }), { 
-           status: 400,
-           headers: { "Content-Type": "application/json" }
-         });
+         return new Response(JSON.stringify({ success: false, error: "Template Name and Product Title required" }), { status: 400, headers: { "Content-Type": "application/json" }});
       }
     } else {
-      // For Orders: We need Customer Info
       if (!customerEmail || !customerName || !productTitle || !optionGroups) {
-        return new Response(JSON.stringify({ 
-          success: false, 
-          error: "Missing required fields (Name, Email, Title)" 
-        }), { 
-          status: 400,
-          headers: { "Content-Type": "application/json" }
-        });
+        return new Response(JSON.stringify({ success: false, error: "Missing required fields" }), { status: 400, headers: { "Content-Type": "application/json" }});
       }
     }
 
-    // --- 2. Data Preparation ---
-    const token = crypto.randomBytes(4).toString('hex'); // 8 characters
+    // Data Preparation
+    const token = crypto.randomBytes(4).toString('hex');
     let tags = "";
     
-    // Clean Option Groups (Ensure numbers are sanitized)
     const cleanOptionGroups = optionGroups ? optionGroups.map(g => ({
       name: g.name,
       values: g.values.map(v => ({
@@ -56,11 +44,10 @@ export async function action({ request }) {
       }))
     })) : [];
 
-    // Note Attributes Setup
     const noteAttributes = [
       { name: "_title", value: productTitle },
       { name: "_img", value: productImage || "" },
-      { name: "_option_groups", value: JSON.stringify(cleanOptionGroups) } // Storing full option structure
+      { name: "_option_groups", value: JSON.stringify(cleanOptionGroups) }
     ];
 
     if (isTemplate) {
@@ -71,39 +58,30 @@ export async function action({ request }) {
       noteAttributes.push({ name: "_token", value: token });
     }
 
-    // Line Items
-    // We set price to 0.00 initially. The final price depends on customer selection on the frontend.
-    const lineItems = [{
-      title: productTitle,
-      quantity: 1,
-      price: "0.00",
-      custom: true
-    }];
-
-    // --- 3. Construct Payload ---
     const draftOrderPayload = {
-      line_items: lineItems,
+      line_items: [{
+        title: productTitle,
+        quantity: 1,
+        price: "0.00",
+        custom: true
+      }],
       tags: tags,
       note: note || "",
       note_attributes: noteAttributes,
       use_customer_default_address: false
     };
 
-    // Add Customer (Only for real orders, optional for templates)
     if (!isTemplate && customerEmail && customerName) {
       const nameParts = customerName.trim().split(' ');
-      const firstName = nameParts[0];
-      const lastName = nameParts.slice(1).join(' ') || '';
-
       draftOrderPayload.customer = {
         email: customerEmail,
-        first_name: firstName,
-        last_name: lastName
+        first_name: nameParts[0],
+        last_name: nameParts.slice(1).join(' ') || ''
       };
       draftOrderPayload.email = customerEmail;
     }
 
-    // --- 4. Call Shopify API ---
+    // Call Shopify API
     const createResponse = await fetch(
       `https://${session.shop}/admin/api/2024-10/draft_orders.json`,
       {
@@ -119,63 +97,30 @@ export async function action({ request }) {
     const createResult = await createResponse.json();
 
     if (!createResponse.ok || createResult.errors) {
-      console.error('Draft order creation error:', createResult);
       return new Response(JSON.stringify({
         success: false,
-        error: typeof createResult.errors === 'string' 
-          ? createResult.errors 
-          : JSON.stringify(createResult.errors)
-      }), { 
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
+        error: JSON.stringify(createResult.errors)
+      }), { status: 400, headers: { "Content-Type": "application/json" }});
     }
 
-    // --- 5. Return Success ---
-    
-    // Scenario A: Template Saved
+    // Return Success
     if (isTemplate) {
-      return new Response(JSON.stringify({
-        success: true,
-        isTemplate: true,
-        message: "Template saved successfully"
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
+      return new Response(JSON.stringify({ success: true, isTemplate: true }), { status: 200, headers: { "Content-Type": "application/json" }});
     }
 
-    // Scenario B: Order Created (Return Link)
     const customerLink = `https://${session.shop}/pages/custom-order?token=${token}`;
-
     return new Response(JSON.stringify({
       success: true,
       draftOrder: createResult.draft_order,
-      customerLink: customerLink,
-      token: token,
-      message: "Draft order created successfully! Copy the link to send to customer."
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
+      customerLink: customerLink
+    }), { status: 200, headers: { "Content-Type": "application/json" }});
 
   } catch (error) {
-    console.error("Error creating draft order:", error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message || "An unexpected error occurred"
-    }), { 
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    console.error("Error:", error);
+    return new Response(JSON.stringify({ success: false, error: error.message }), { status: 500, headers: { "Content-Type": "application/json" }});
   }
 }
 
 export async function loader() {
-  return new Response(JSON.stringify({ 
-    error: "Method not allowed" 
-  }), { 
-    status: 405,
-    headers: { "Content-Type": "application/json" }
-  });
+  return new Response("Method not allowed", { status: 405 });
 }
