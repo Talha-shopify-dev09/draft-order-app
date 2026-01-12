@@ -1,9 +1,8 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-
 client_id = "b2eaee3831b4a32d2e122de0a85859a1"
 name = "Draft order app"
-application_url = "https://example.com"
+application_url = "https://draft-order-app-rk3s.onrender.com"
 embedded = true
 
 [build]
@@ -28,8 +27,13 @@ optional_scopes = [ ]
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ ]
+redirect_urls = [ 
+  "https://draft-order-app-rk3s.onrender.com/auth/callback",
+  "https://draft-order-app-rk3s.onrender.com/auth/shopify/callback",
+  "https://draft-order-app-rk3s.onrender.com/api/auth/callback"
+]
+
 [app_proxy]
-url = "https://however-planning-candy-greg.trycloudflare.com/"
+url = "https://draft-order-app-rk3s.onrender.com"
 subpath = "draft-order-proxy"
 prefix = "apps"
