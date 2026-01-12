@@ -213,7 +213,7 @@
     let selectedVariant = null;
     
     // Update this with your current tunnel URL
-    const appUrl = 'https://influence-choir-walked-favour.trycloudflare.com/';
+    const appUrl = 'https://email-shops-tractor-organised.trycloudflare.com';
     
     // Fetch order data
     fetch(`${appUrl}/api/get-order?token=${token}&shop=${shop}`)
@@ -300,6 +300,14 @@
       button.disabled = true;
       button.textContent = 'Processing...';
       
+      console.log('Checkout request:', {
+        token: token,
+        draftOrderId: orderData.draftOrderId,
+        variantName: selectedVariant.name,
+        price: selectedVariant.price,
+        shop: shop
+      });
+      
       fetch(`${appUrl}/api/process-checkout`, {
         method: 'POST',
         headers: {
@@ -313,8 +321,12 @@
           shop: shop
         })
       })
-      .then(res => res.json())
+      .then(res => {
+        console.log('Response status:', res.status);
+        return res.json();
+      })
       .then(data => {
+        console.log('Response data:', data);
         if (data.success && data.checkoutUrl) {
           window.location.href = data.checkoutUrl;
         } else {
