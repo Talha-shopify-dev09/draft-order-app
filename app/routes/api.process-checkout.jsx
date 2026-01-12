@@ -1,19 +1,30 @@
 // app/routes/api.process-checkout.jsx
 
-export async function action({ request }) {
-  // 1. Define CORS Headers (Critical for "Failed to fetch" fix)
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
+// 1. Define CORS Headers
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS", // Allow POST and OPTIONS
+  "Access-Control-Allow-Headers": "Content-Type",
+};
 
-  // 2. Handle Pre-flight (Browser asking permission)
+// 2. REQUIRED: Handle OPTIONS requests here (The missing piece!)
+export async function loader({ request }) {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+  
+  // If someone tries to GET this URL, tell them it's not allowed
+  return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
+}
+
+// 3. Handle the real POST request
+export async function action({ request }) {
+  // Handle Pre-flight inside action too (just to be safe)
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Helper for clean JSON responses
+  // Helper for JSON response
   const jsonResponse = (data, status = 200) => {
     return new Response(JSON.stringify(data), {
       status,
@@ -33,7 +44,7 @@ export async function action({ request }) {
         return jsonResponse({ success: false, error: "Missing order ID" }, 400);
     }
 
-    // 3. Update the Draft Order in Shopify
+    // Update the Draft Order
     const updateResponse = await fetch(
       `https://${shop}/admin/api/2024-10/draft_orders/${draftOrderId}.json`,
       {
@@ -50,7 +61,7 @@ export async function action({ request }) {
                 price: price,
                 quantity: 1,
                 custom: true, 
-                taxable: false // Optional: adjust based on needs
+                taxable: false 
               },
             ],
           },
@@ -65,7 +76,6 @@ export async function action({ request }) {
       throw new Error(JSON.stringify(updateData));
     }
 
-    // 4. Return the invoice URL
     return jsonResponse({
       success: true,
       checkoutUrl: updateData.draft_order.invoice_url,
