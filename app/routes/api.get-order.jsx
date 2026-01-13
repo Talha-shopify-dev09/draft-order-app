@@ -1,4 +1,5 @@
 // app/routes/api.get-order.jsx
+import prisma from "../db.server"; // Import your database client
 
 export async function loader({ request }) {
   // 1. CORS Headers (Allow frontend to talk to backend)
@@ -30,14 +31,27 @@ export async function loader({ request }) {
   }
 
   try {
-    const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+    // 2. FIND SESSION IN DATABASE (Multi-Tenant Logic)
+    // We search for the most recent valid session for this specific shop
+    const session = await prisma.session.findFirst({
+      where: { shop: shop },
+      orderBy: { expires: 'desc' } // Get the newest session first
+    });
 
-    // 2. Fetch Draft Orders from Shopify
+    // Check if store has installed the app
+    if (!session || !session.accessToken) {
+      console.error(`Unauthorized access attempt for shop: ${shop}`);
+      return jsonResponse({ success: false, error: "Shop not authorized. Please install the app." }, 403);
+    }
+
+    const accessToken = session.accessToken;
+
+    // 3. Fetch Draft Orders from Shopify
     const response = await fetch(
       `https://${shop}/admin/api/2024-10/draft_orders.json?limit=250`,
       {
         headers: {
-          "X-Shopify-Access-Token": accessToken,
+          "X-Shopify-Access-Token": accessToken, // Use the DB token
           "Content-Type": "application/json",
         },
       }
@@ -45,7 +59,7 @@ export async function loader({ request }) {
 
     const data = await response.json();
     
-    // 3. Find the specific order
+    // 4. Find the specific order
     const draftOrder = data.draft_orders?.find((order) =>
       order.tags?.includes(`t_${token}`)
     );
@@ -54,7 +68,7 @@ export async function loader({ request }) {
       return jsonResponse({ success: false, error: "Order not found" }, 404);
     }
 
-    // 4. Extract Data Safely
+    // 5. Extract Data Safely
     const getAttr = (name) => {
       const attr = draftOrder.note_attributes?.find((a) => a.name === name);
       return attr ? attr.value : null;
@@ -74,14 +88,14 @@ export async function loader({ request }) {
     // Parse Image (Cloudinary URL)
     const imgUrl = getAttr("_img");
 
-    // 5. Return Data to Frontend
+    // 6. Return Data to Frontend
     return jsonResponse({
       success: true,
       draftOrderId: draftOrder.id,
       productTitle: getAttr("_title") || "Custom Order",
-      productImage: imgUrl,      // <--- Frontend looks for this exact name
+      productImage: imgUrl,
       note: draftOrder.note,
-      optionGroups: optionGroups, // <--- Frontend loops through this
+      optionGroups: optionGroups,
       price: draftOrder.total_price,
       currency: draftOrder.currency,
     });
