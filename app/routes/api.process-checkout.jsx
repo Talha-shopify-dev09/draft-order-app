@@ -18,12 +18,10 @@ export async function loader({ request }) {
 
 // 3. Handle POST
 export async function action({ request }) {
-  // Handle Pre-flight inside action too
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Helper for JSON response
   const jsonResponse = (data, status = 200) => {
     return new Response(JSON.stringify(data), {
       status,
@@ -33,8 +31,6 @@ export async function action({ request }) {
 
   try {
     const body = await request.json();
-    // CHANGED: We now accept 'token' (DB ID) instead of 'draftOrderId'
-    // We also accept 'customImage' to show the link in checkout
     const { token, variantName, price, shop, currency, customImage } = body;
 
     // 1. Validate inputs
@@ -42,40 +38,37 @@ export async function action({ request }) {
       return jsonResponse({ success: false, error: "Missing shop or price" }, 400);
     }
 
-    // 2. Look up the Session (Credentials)
+    // 2. Look up Session
     const session = await db.session.findFirst({
       where: { shop: shop },
     });
 
     if (!session || !session.accessToken) {
       console.error(`No session found for shop: ${shop}`);
-      return jsonResponse({ success: false, error: "Shop not authorized (No token found)" }, 401);
+      return jsonResponse({ success: false, error: "Shop not authorized" }, 401);
     }
 
-    const accessToken = session.accessToken; 
-
-    // 3. Prepare the Line Item
+    // 3. Prepare Line Item
     const lineItem = {
       title: variantName || "Custom Order",
       price: price,
       quantity: 1,
-      custom: true, // Important: Tells Shopify this is a custom item
-      taxable: true, // Usually custom orders are taxable
+      custom: true,
+      taxable: true,
       properties: []
     };
 
-    // If an image exists, add it as a clickable link in checkout
     if (customImage) {
       lineItem.properties.push({ name: "Preview Image", value: customImage });
     }
 
-    // 4. CREATE (POST) the Draft Order
+    // 4. CREATE DRAFT ORDER
     const createResponse = await fetch(
       `https://${shop}/admin/api/2024-10/draft_orders.json`,
       {
-        method: "POST", // <--- CHANGED FROM PUT TO POST
+        method: "POST",
         headers: {
-          "X-Shopify-Access-Token": accessToken,
+          "X-Shopify-Access-Token": session.accessToken,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -83,8 +76,15 @@ export async function action({ request }) {
             line_items: [lineItem],
             currency: currency || "USD",
             use_customer_default_address: false,
-            // Add a tag so you can find these orders later in Shopify Admin
-            tags: `app_custom_order, token_${token}`
+            
+            // --- FIX IS HERE ---
+            // 1. Use a short, simple tag
+            tags: "app_custom_order", 
+            
+            // 2. Put the long token in note_attributes (No 40 char limit here)
+            note_attributes: [
+              { name: "_app_token", value: token }
+            ]
           },
         }),
       }
@@ -92,12 +92,13 @@ export async function action({ request }) {
 
     const createData = await createResponse.json();
 
+    // Catch Errors (Like the tag error you just saw)
     if (!createResponse.ok) {
-      console.error("Shopify Creation Failed:", createData);
+      console.error("Shopify Creation Failed:", JSON.stringify(createData));
       return jsonResponse({ success: false, error: JSON.stringify(createData) }, 500);
     }
 
-    // 5. Success! Return the Invoice URL
+    // 5. Success
     return jsonResponse({
       success: true,
       checkoutUrl: createData.draft_order.invoice_url,
