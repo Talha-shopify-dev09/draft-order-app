@@ -1,24 +1,23 @@
 // app/routes/api.get-order.jsx
-import prisma from "../db.server"; // Import your database client
+import db from "../db.server";
+
+// 1. CORS Headers (Allow frontend to talk to backend)
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
 
 export async function loader({ request }) {
-  // 1. CORS Headers (Allow frontend to talk to backend)
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
-
-  // Handle Browser Pre-check
+  // Handle Browser Pre-check (OPTIONS request)
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
-  const shop = url.searchParams.get("shop");
-
-  // Helper for JSON response
+  
+  // Helper for JSON response (No Remix 'json' helper used)
   const jsonResponse = (data, status = 200) => {
     return new Response(JSON.stringify(data), {
       status,
@@ -26,82 +25,58 @@ export async function loader({ request }) {
     });
   };
 
-  if (!token || !shop) {
-    return jsonResponse({ success: false, error: "Missing token or shop" }, 400);
+  if (!token) {
+    return jsonResponse({ success: false, error: "Missing token" }, 400);
   }
 
   try {
-    // 2. FIND SESSION IN DATABASE (Multi-Tenant Logic)
-    // We search for the most recent valid session for this specific shop
-    const session = await prisma.session.findFirst({
-      where: { shop: shop },
-      orderBy: { expires: 'desc' } // Get the newest session first
+    console.log(`[API] Looking up order in DB with ID: ${token}`);
+
+    // 2. FIND ORDER IN DATABASE
+    // We search by the ID directly (which is the token in the URL)
+    const order = await db.orderBlock.findUnique({
+      where: { id: token },
     });
 
-    // Check if store has installed the app
-    if (!session || !session.accessToken) {
-      console.error(`Unauthorized access attempt for shop: ${shop}`);
-      return jsonResponse({ success: false, error: "Shop not authorized. Please install the app." }, 403);
+    if (!order) {
+      console.error(`[API] Order not found for ID: ${token}`);
+      return jsonResponse({ success: false, error: "Order not found or expired" }, 404);
     }
 
-    const accessToken = session.accessToken;
-
-    // 3. Fetch Draft Orders from Shopify
-    const response = await fetch(
-      `https://${shop}/admin/api/2024-10/draft_orders.json?limit=250`,
-      {
-        headers: {
-          "X-Shopify-Access-Token": accessToken, // Use the DB token
-          "Content-Type": "application/json",
-        },
+    // 3. PARSE DATA SAFELY
+    // Database stores arrays as JSON strings, so we parse them back to arrays
+    let images = [];
+    try {
+      images = JSON.parse(order.images || "[]");
+    } catch (e) {
+      // Fallback for old data format
+      if (order.images && order.images.startsWith("http")) {
+        images = [order.images];
       }
-    );
-
-    const data = await response.json();
-    
-    // 4. Find the specific order
-    const draftOrder = data.draft_orders?.find((order) =>
-      order.tags?.includes(`t_${token}`)
-    );
-
-    if (!draftOrder) {
-      return jsonResponse({ success: false, error: "Order not found" }, 404);
     }
 
-    // 5. Extract Data Safely
-    const getAttr = (name) => {
-      const attr = draftOrder.note_attributes?.find((a) => a.name === name);
-      return attr ? attr.value : null;
-    };
-
-    // Parse Option Groups (The new dropdowns)
     let optionGroups = [];
-    const rawGroups = getAttr("_option_groups");
-    if (rawGroups) {
-      try {
-        optionGroups = JSON.parse(rawGroups);
-      } catch (e) {
-        console.error("Error parsing option groups:", e);
-      }
+    try {
+      optionGroups = JSON.parse(order.optionGroups || "[]");
+    } catch (e) {
+      console.error("Error parsing option groups", e);
     }
 
-    // Parse Image (Cloudinary URL)
-    const imgUrl = getAttr("_img");
-
-    // 6. Return Data to Frontend
+    // 4. RETURN DATA
     return jsonResponse({
       success: true,
-      draftOrderId: draftOrder.id,
-      productTitle: getAttr("_title") || "Custom Order",
-      productImage: imgUrl,
-      note: draftOrder.note,
+      productTitle: order.productTitle,
+      note: order.note,
+      images: images,       // Array of image URLs
+      video: order.video,   // Video URL
       optionGroups: optionGroups,
-      price: draftOrder.total_price,
-      currency: draftOrder.currency,
+      // If you are later converting this to a real Shopify Draft Order, pass that ID here
+      // For now, we return the DB ID so the frontend has context
+      dbId: order.id 
     });
 
   } catch (error) {
     console.error("API Error:", error);
-    return jsonResponse({ success: false, error: "Server error" }, 500);
+    return jsonResponse({ success: false, error: "Server error: " + error.message }, 500);
   }
 }
