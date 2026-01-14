@@ -19,11 +19,7 @@ import {
 import { DeleteIcon, PlusIcon, SaveIcon, ImageIcon, PlayIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 
-// --- 1. LOADER: FETCH CURRENCY ---
-// app/routes/app._index.jsx
-
-// ... imports remain the same ...
-
+// --- 1. LOADER: FETCH CURRENCY (FIXED) ---
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
   
@@ -41,7 +37,8 @@ export const loader = async ({ request }) => {
   const data = await response.json();
   const moneyFormat = data.data.shop.currencyFormats.moneyFormat;
   
-  // FIX: Stronger Regex to remove {{amount}} AND {{amount_with_comma_separator}}
+  // FIX: Stronger Regex to remove ALL Shopify formatting variables
+  // This removes {{amount}}, {{amount_with_comma_separator}}, etc.
   const currencySymbol = moneyFormat
     .replace(/\{\{.*?\}\}/g, "") // Removes anything inside {{ }}
     .replace(/<[^>]*>/g, "")     // Removes <span> or HTML tags
@@ -49,8 +46,6 @@ export const loader = async ({ request }) => {
 
   return { shop: session.shop, currencySymbol };
 };
-
-// ... Rest of the file remains the same ...
 
 export default function Index() {
   // Get currencySymbol from loader
@@ -305,8 +300,6 @@ export default function Index() {
         video: uploadedVideoUrl,
         isTemplate: saveAsTemplate,
         templateName: saveAsTemplate ? templateName : null,
-        // Optional: Pass currency if your backend needs it to create draft order in correct currency
-        currency: currencySymbol 
       };
 
       const response = await fetch("/api/draft-order", {
@@ -432,7 +425,7 @@ export default function Index() {
 
               <div style={{ height: '10px' }}></div>
 
-              {/* Video Section (Fixed Layout) */}
+              {/* Video Section */}
               <Text variant="headingSm" as="h3">Product Video (Max 1)</Text>
               {formData.video ? (
                 <BlockStack gap="200" align="start">
@@ -481,10 +474,10 @@ export default function Index() {
                            <TextField placeholder="Label (e.g. 10x10)" value={val.label} onChange={(v) => updateValue(groupIdx, valIdx, 'label', v)} autoComplete="off" />
                         </div>
                         <div style={{flex: 1}}>
-                           {/* 2. DYNAMIC CURRENCY SYMBOL USED HERE */}
+                           {/* DYNAMIC CURRENCY SYMBOL */}
                            <TextField 
                                 type="number" 
-                                prefix={currencySymbol} // <--- Shows £, €, etc.
+                                prefix={currencySymbol} 
                                 placeholder="Price" 
                                 value={val.price} 
                                 onChange={(v) => updateValue(groupIdx, valIdx, 'price', v)} 
