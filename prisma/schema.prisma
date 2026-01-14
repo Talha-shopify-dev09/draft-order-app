@@ -1,34 +1,55 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
   provider = "sqlite"
   url      = "file:dev.sqlite"
 }
 
 model Session {
-  id            String    @id
+  id             String    @id
+  shop           String
+  state          String
+  isOnline       Boolean   @default(false)
+  scope          String?
+  expires        DateTime?
+  accessToken    String
+  userId         BigInt?
+  firstName      String?
+  lastName       String?
+  email          String?
+  accountOwner   Boolean   @default(false)
+  locale         String?
+  collaborator   Boolean?  @default(false)
+  emailVerified  Boolean?  @default(false)
+  refreshToken         String?
+  refreshTokenExpires  DateTime?
+}
+
+// --- ADDED MODELS BELOW ---
+
+model OrderBlock {
+  id            String   @id @default(uuid())
   shop          String
-  state         String
-  isOnline      Boolean   @default(false)
-  scope         String?
-  expires       DateTime?
-  accessToken   String
-  userId        BigInt?
-  firstName     String?
-  lastName      String?
-  email         String?
-  accountOwner  Boolean   @default(false)
-  locale        String?
-  collaborator  Boolean?  @default(false)
-  emailVerified Boolean?  @default(false)
-  refreshToken        String?
-  refreshTokenExpires DateTime?
+  productTitle  String
+  customerName  String?
+  customerEmail String?
+  note          String?
+  optionGroups  String   @default("[]") // Stores JSON string of options
+  images        String   @default("[]") // Stores JSON string of image URLs
+  video         String?                 // Stores video URL
+  createdAt     DateTime @default(now())
+}
+
+model Template {
+  id            String   @id @default(uuid())
+  shop          String
+  name          String
+  productTitle  String
+  optionGroups  String   @default("[]")
+  images        String?  @default("[]")
+  createdAt     DateTime @default(now())
 }
