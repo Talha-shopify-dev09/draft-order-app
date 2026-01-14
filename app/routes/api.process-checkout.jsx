@@ -1,6 +1,6 @@
 // app/routes/api.process-checkout.jsx
-import { json } from "@remix-run/node";
-import db from "../db.server"; // Import your database connection
+// ❌ REMOVED: import { json } from "@remix-run/node"; (This caused the error)
+import db from "../db.server"; 
 
 // 1. Define CORS Headers
 const corsHeaders = {
@@ -36,15 +36,12 @@ export async function action({ request }) {
     const body = await request.json();
     const { draftOrderId, variantName, price, shop } = body;
 
-    // --- FIX STARTS HERE ---
-    
     // 1. Validate we have a shop URL
     if (!shop || !draftOrderId) {
       return jsonResponse({ success: false, error: "Missing shop or order ID" }, 400);
     }
 
     // 2. Look up the CORRECT token for this specific shop from the database
-    // We search for a session where the shop matches
     const session = await db.session.findFirst({
       where: { shop: shop },
     });
@@ -54,9 +51,7 @@ export async function action({ request }) {
       return jsonResponse({ success: false, error: "Shop not authorized (No token found)" }, 401);
     }
 
-    const accessToken = session.accessToken; // <--- NOW WE HAVE THE CORRECT KEY!
-
-    // --- FIX ENDS HERE ---
+    const accessToken = session.accessToken; 
 
     // 3. Update the Draft Order
     const updateResponse = await fetch(
@@ -87,7 +82,6 @@ export async function action({ request }) {
 
     if (!updateResponse.ok) {
       console.error("Shopify Update Failed:", updateData);
-      // Pass the actual error message back to the frontend
       return jsonResponse({ success: false, error: JSON.stringify(updateData) }, 500);
     }
 
