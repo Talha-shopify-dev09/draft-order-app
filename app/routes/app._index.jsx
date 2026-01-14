@@ -20,10 +20,14 @@ import { DeleteIcon, PlusIcon, SaveIcon, ImageIcon, PlayIcon } from "@shopify/po
 import { authenticate } from "../shopify.server";
 
 // --- 1. LOADER: FETCH CURRENCY ---
+// app/routes/app._index.jsx
+
+// ... imports remain the same ...
+
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
   
-  // Query Shopify to get the Money Format (e.g. "£{{amount}}")
+  // Query Shopify to get the Money Format
   const response = await admin.graphql(`
     query {
       shop {
@@ -37,14 +41,16 @@ export const loader = async ({ request }) => {
   const data = await response.json();
   const moneyFormat = data.data.shop.currencyFormats.moneyFormat;
   
-  // Extract the symbol by removing {{amount}} and HTML tags
+  // FIX: Stronger Regex to remove {{amount}} AND {{amount_with_comma_separator}}
   const currencySymbol = moneyFormat
-    .replace("{{amount}}", "")
-    .replace(/<[^>]*>/g, "") // Remove <span> tags if any
+    .replace(/\{\{.*?\}\}/g, "") // Removes anything inside {{ }}
+    .replace(/<[^>]*>/g, "")     // Removes <span> or HTML tags
     .trim();
 
   return { shop: session.shop, currencySymbol };
 };
+
+// ... Rest of the file remains the same ...
 
 export default function Index() {
   // Get currencySymbol from loader

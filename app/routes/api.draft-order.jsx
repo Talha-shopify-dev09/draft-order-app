@@ -1,11 +1,10 @@
-// app/routes/api.draft-order.jsx
-import crypto from "crypto"; // Native Node modules are fine to keep at top
+import db from "../db.server";
+import { authenticate } from "../shopify.server";
 
 export async function action({ request }) {
-  // DYNAMIC IMPORT: Fixes build error
-  const { authenticate } = await import("../shopify.server");
-  
-  const { admin, session } = await authenticate.admin(request);
+  // 1. Authenticate
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
 
   try {
     const body = await request.json();
@@ -14,110 +13,77 @@ export async function action({ request }) {
       customerName, 
       productTitle, 
       note, 
-      optionGroups,
-      productImage,
-      isTemplate,
+      optionGroups, 
+      images, 
+      video, 
+      isTemplate, 
       templateName 
     } = body;
 
-    // Validation
+    // 2. Validation
     if (isTemplate) {
       if (!productTitle || !templateName) {
-         return new Response(JSON.stringify({ success: false, error: "Template Name and Product Title required" }), { status: 400, headers: { "Content-Type": "application/json" }});
+        return Response.json(
+          { success: false, error: "Template Name and Product Title required" },
+          { status: 400 }
+        );
       }
     } else {
-      if (!customerEmail || !customerName || !productTitle || !optionGroups) {
-        return new Response(JSON.stringify({ success: false, error: "Missing required fields" }), { status: 400, headers: { "Content-Type": "application/json" }});
+      if (!productTitle) {
+        return Response.json(
+          { success: false, error: "Product Title is required" },
+          { status: 400 }
+        );
       }
     }
 
-    // Data Preparation
-    const token = crypto.randomBytes(4).toString('hex');
-    let tags = "";
-    
-    const cleanOptionGroups = optionGroups ? optionGroups.map(g => ({
-      name: g.name,
-      values: g.values.map(v => ({
-        id: v.id,
-        label: v.label,
-        price: v.price || "0"
-      }))
-    })) : [];
+    // 3. Prepare Data
+    const imagesString = JSON.stringify(images || []);
+    const optionsString = JSON.stringify(optionGroups || []);
 
-    const noteAttributes = [
-      { name: "_title", value: productTitle },
-      { name: "_img", value: productImage || "" },
-      { name: "_option_groups", value: JSON.stringify(cleanOptionGroups) }
-    ];
+    let createdRecord;
 
     if (isTemplate) {
-      tags = "app_template";
-      noteAttributes.push({ name: "_template_name", value: templateName });
-    } else {
-      tags = `custom,t_${token}`;
-      noteAttributes.push({ name: "_token", value: token });
-    }
-
-    const draftOrderPayload = {
-      line_items: [{
-        title: productTitle,
-        quantity: 1,
-        price: "0.00",
-        custom: true
-      }],
-      tags: tags,
-      note: note || "",
-      note_attributes: noteAttributes,
-      use_customer_default_address: false
-    };
-
-    if (!isTemplate && customerEmail && customerName) {
-      const nameParts = customerName.trim().split(' ');
-      draftOrderPayload.customer = {
-        email: customerEmail,
-        first_name: nameParts[0],
-        last_name: nameParts.slice(1).join(' ') || ''
-      };
-      draftOrderPayload.email = customerEmail;
-    }
-
-    // Call Shopify API
-    const createResponse = await fetch(
-      `https://${session.shop}/admin/api/2024-10/draft_orders.json`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': session.accessToken
+      // --- SAVE AS TEMPLATE ---
+      createdRecord = await db.template.create({
+        data: {
+          shop,
+          name: templateName,
+          productTitle,
+          optionGroups: optionsString,
+          // images: imagesString, // Uncomment if your Template model has images
         },
-        body: JSON.stringify({ draft_order: draftOrderPayload })
-      }
-    );
+      });
 
-    const createResult = await createResponse.json();
+      return Response.json({ success: true, isTemplate: true });
 
-    if (!createResponse.ok || createResult.errors) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: JSON.stringify(createResult.errors)
-      }), { status: 400, headers: { "Content-Type": "application/json" }});
+    } else {
+      // --- SAVE AS ORDER BLOCK ---
+      createdRecord = await db.orderBlock.create({
+        data: {
+          shop,
+          productTitle,
+          customerName: customerName || "",
+          customerEmail: customerEmail || "",
+          note: note || "",
+          optionGroups: optionsString,
+          images: imagesString,
+          video: video || null,
+        },
+      });
+
+      // 4. Generate Link
+      const customerLink = `https://${shop}/pages/custom-order?token=${createdRecord.id}`;
+
+      return Response.json({ success: true, customerLink });
     }
-
-    // Return Success
-    if (isTemplate) {
-      return new Response(JSON.stringify({ success: true, isTemplate: true }), { status: 200, headers: { "Content-Type": "application/json" }});
-    }
-
-    const customerLink = `https://${session.shop}/pages/custom-order?token=${token}`;
-    return new Response(JSON.stringify({
-      success: true,
-      draftOrder: createResult.draft_order,
-      customerLink: customerLink
-    }), { status: 200, headers: { "Content-Type": "application/json" }});
 
   } catch (error) {
-    console.error("Error:", error);
-    return new Response(JSON.stringify({ success: false, error: error.message }), { status: 500, headers: { "Content-Type": "application/json" }});
+    console.error("Error creating order block:", error);
+    return Response.json(
+      { success: false, error: "Server error: " + error.message },
+      { status: 500 }
+    );
   }
 }
 
