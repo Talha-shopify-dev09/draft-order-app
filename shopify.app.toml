@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "b2eaee3831b4a32d2e122de0a85859a1"
-name = "Draft order app"
+client_id = "2d20044d29fb43a8ddc7d031b717cb9c"
+name = "Socoba Draft order app"
 application_url = "https://draft-order-app-rk3s.onrender.com"
 embedded = true
 
