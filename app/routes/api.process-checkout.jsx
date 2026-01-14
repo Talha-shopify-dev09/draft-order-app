@@ -1,6 +1,5 @@
 // app/routes/api.process-checkout.jsx
-// ❌ REMOVED: import { json } from "@remix-run/node"; (This caused the error)
-import db from "../db.server"; 
+import db from "../db.server";
 
 // 1. Define CORS Headers
 const corsHeaders = {
@@ -34,14 +33,16 @@ export async function action({ request }) {
 
   try {
     const body = await request.json();
-    const { draftOrderId, variantName, price, shop } = body;
+    // CHANGED: We now accept 'token' (DB ID) instead of 'draftOrderId'
+    // We also accept 'customImage' to show the link in checkout
+    const { token, variantName, price, shop, currency, customImage } = body;
 
-    // 1. Validate we have a shop URL
-    if (!shop || !draftOrderId) {
-      return jsonResponse({ success: false, error: "Missing shop or order ID" }, 400);
+    // 1. Validate inputs
+    if (!shop || !price) {
+      return jsonResponse({ success: false, error: "Missing shop or price" }, 400);
     }
 
-    // 2. Look up the CORRECT token for this specific shop from the database
+    // 2. Look up the Session (Credentials)
     const session = await db.session.findFirst({
       where: { shop: shop },
     });
@@ -53,45 +54,57 @@ export async function action({ request }) {
 
     const accessToken = session.accessToken; 
 
-    // 3. Update the Draft Order
-    const updateResponse = await fetch(
-      `https://${shop}/admin/api/2024-10/draft_orders/${draftOrderId}.json`,
+    // 3. Prepare the Line Item
+    const lineItem = {
+      title: variantName || "Custom Order",
+      price: price,
+      quantity: 1,
+      custom: true, // Important: Tells Shopify this is a custom item
+      taxable: true, // Usually custom orders are taxable
+      properties: []
+    };
+
+    // If an image exists, add it as a clickable link in checkout
+    if (customImage) {
+      lineItem.properties.push({ name: "Preview Image", value: customImage });
+    }
+
+    // 4. CREATE (POST) the Draft Order
+    const createResponse = await fetch(
+      `https://${shop}/admin/api/2024-10/draft_orders.json`,
       {
-        method: "PUT",
+        method: "POST", // <--- CHANGED FROM PUT TO POST
         headers: {
           "X-Shopify-Access-Token": accessToken,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           draft_order: {
-            line_items: [
-              {
-                title: variantName,
-                price: price,
-                quantity: 1,
-                custom: true, 
-                taxable: false 
-              },
-            ],
+            line_items: [lineItem],
+            currency: currency || "USD",
+            use_customer_default_address: false,
+            // Add a tag so you can find these orders later in Shopify Admin
+            tags: `app_custom_order, token_${token}`
           },
         }),
       }
     );
 
-    const updateData = await updateResponse.json();
+    const createData = await createResponse.json();
 
-    if (!updateResponse.ok) {
-      console.error("Shopify Update Failed:", updateData);
-      return jsonResponse({ success: false, error: JSON.stringify(updateData) }, 500);
+    if (!createResponse.ok) {
+      console.error("Shopify Creation Failed:", createData);
+      return jsonResponse({ success: false, error: JSON.stringify(createData) }, 500);
     }
 
+    // 5. Success! Return the Invoice URL
     return jsonResponse({
       success: true,
-      checkoutUrl: updateData.draft_order.invoice_url,
+      checkoutUrl: createData.draft_order.invoice_url,
     });
 
   } catch (error) {
-    console.error("Checkout Error:", error);
+    console.error("Checkout Server Error:", error);
     return jsonResponse({ success: false, error: "Server error processing checkout" }, 500);
   }
 }
