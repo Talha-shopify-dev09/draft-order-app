@@ -1,12 +1,13 @@
 {% comment %}
-  Custom Order Block
-  Displays product with configurable Option Groups (Dropdowns)
+  Custom Order Block with Media Slider (Video First)
 {% endcomment %}
 
 <div class="custom-order-block" id="custom-order-{{ section.id }}">
   <div class="custom-order-container">
+    
     <div id="order-loading" class="order-loading">
-      <p>Loading your order...</p>
+      <div class="spinner"></div>
+      <p>Loading your order details...</p>
     </div>
     
     <div id="order-error" class="order-error" style="display: none;">
@@ -15,19 +16,30 @@
     </div>
     
     <div id="order-content" class="order-content" style="display: none;">
-      <div class="product-image-wrapper">
-        <img id="product-image" src="" alt="" class="product-image" style="display: none;">
+      
+      <div class="media-section">
+        <div class="slider-wrapper">
+          <button id="prev-btn" class="slider-arrow left-arrow" style="display:none;">&#10094;</button>
+          
+          <div id="media-track" class="media-track">
+            </div>
+
+          <button id="next-btn" class="slider-arrow right-arrow" style="display:none;">&#10095;</button>
+        </div>
+        <div id="slider-dots" class="slider-dots"></div>
       </div>
       
       <div class="product-details">
         <h1 id="product-title" class="product-title"></h1>
-        <p id="product-note" class="product-note"></p>
-        
-        <div id="options-container" class="options-container"></div>
         
         <div class="price-display">
           <span id="product-price" class="product-price">$0.00</span>
+          <span id="currency-code" style="font-size: 16px; color: #666; margin-left: 5px;">USD</span>
         </div>
+        
+        <p id="product-note" class="product-note"></p>
+        
+        <div id="options-container" class="options-container"></div>
         
         <div id="checkout-error" class="checkout-error" style="display: none;"></div>
         
@@ -35,49 +47,86 @@
           Proceed to Checkout
         </button>
         
-        <p class="secure-notice">🔒 Secure checkout</p>
+        <p class="secure-notice">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg> 
+          Secure checkout
+        </p>
       </div>
+
     </div>
   </div>
 </div>
 
 <style>
-  .custom-order-block { max-width: 1200px; margin: 50px auto; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  .custom-order-container { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
-  .order-loading, .order-error { padding: 60px 20px; text-align: center; }
-  .order-error { background: #fee; color: #c33; }
-  .order-content { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding: 40px; }
+  /* --- LAYOUT --- */
+  .custom-order-block { max-width: 1100px; margin: 40px auto; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  .custom-order-container { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; }
   
-  @media (max-width: 768px) { .order-content { grid-template-columns: 1fr; } }
-  
-  .product-image-wrapper { min-height: 400px; background: #f5f5f5; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-  .product-image { width: 100%; max-height: 500px; object-fit: cover; border-radius: 8px; }
-  .product-title { font-size: 32px; font-weight: 600; margin-bottom: 15px; color: #333; }
-  .product-note { color: #666; line-height: 1.6; margin-bottom: 30px; }
-  
-  /* NEW STYLES FOR DROPDOWNS */
-  .options-container { margin-bottom: 25px; }
-  .option-group { margin-bottom: 20px; }
-  .option-label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; font-size: 14px; }
-  .option-select { 
-    width: 100%; 
-    padding: 12px; 
-    border: 1px solid #ddd; 
-    border-radius: 6px; 
-    font-size: 16px; 
-    background-color: white;
-    cursor: pointer;
-  }
-  .option-select:focus { border-color: #5469d4; outline: none; }
+  .order-content { display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; padding: 40px; }
+  @media (max-width: 768px) { .order-content { grid-template-columns: 1fr; padding: 20px; } }
 
-  .price-display { margin-bottom: 30px; }
-  .product-price { font-size: 36px; font-weight: bold; color: #333; }
+  /* --- SPINNER --- */
+  .order-loading { padding: 80px 20px; text-align: center; }
+  .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #5469d4; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px; }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+  /* --- SLIDER STYLES --- */
+  .media-section { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; }
+  .slider-wrapper { position: relative; width: 100%; height: 500px; background: #f8f9fa; border-radius: 10px; overflow: hidden; display: flex; align-items: center; }
   
-  .checkout-error { padding: 12px; background: #fee; color: #c33; border-radius: 6px; margin-bottom: 20px; }
-  .checkout-button { width: 100%; padding: 18px; background: #5469d4; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-  .checkout-button:hover { background: #4158d0; }
-  .checkout-button:disabled { background: #ccc; cursor: not-allowed; }
-  .secure-notice { text-align: center; color: #999; font-size: 12px; margin-top: 15px; }
+  .media-track { 
+    display: flex; 
+    overflow-x: auto; 
+    scroll-behavior: smooth; 
+    width: 100%; 
+    height: 100%;
+    scrollbar-width: none; /* Hide scrollbar Firefox */
+    -ms-overflow-style: none; /* Hide scrollbar IE */
+  }
+  .media-track::-webkit-scrollbar { display: none; } /* Hide scrollbar Chrome */
+
+  .media-item { flex: 0 0 100%; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
+  
+  .media-item img { width: 100%; height: 100%; object-fit: contain; background: #f8f9fa; }
+  .media-item video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+
+  /* --- ARROWS --- */
+  .slider-arrow { 
+    position: absolute; top: 50%; transform: translateY(-50%); 
+    background: rgba(255, 255, 255, 0.8); border: none; cursor: pointer; 
+    width: 40px; height: 40px; border-radius: 50%; 
+    font-size: 20px; color: #333; z-index: 10;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.2s;
+  }
+  .slider-arrow:hover { background: white; transform: translateY(-50%) scale(1.1); }
+  .left-arrow { left: 15px; }
+  .right-arrow { right: 15px; }
+
+  /* --- DETAILS --- */
+  .product-title { font-size: 28px; font-weight: 700; margin: 0 0 10px; color: #1a1a1a; line-height: 1.2; }
+  .product-note { color: #555; margin-bottom: 25px; line-height: 1.5; font-size: 15px; }
+  .price-display { margin-bottom: 25px; display: flex; align-items: baseline; }
+  .product-price { font-size: 32px; font-weight: 700; color: #2c2c2c; }
+
+  /* --- DROPDOWNS --- */
+  .option-group { margin-bottom: 18px; }
+  .option-label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; font-size: 14px; }
+  .option-select { 
+    width: 100%; padding: 12px; border: 1px solid #e1e1e1; 
+    border-radius: 8px; font-size: 15px; background: white; 
+    transition: border 0.2s; -webkit-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23333%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; background-size: 10px;
+  }
+  .option-select:focus { border-color: #5469d4; outline: none; box-shadow: 0 0 0 2px rgba(84, 105, 212, 0.2); }
+
+  /* --- BUTTON --- */
+  .checkout-button { width: 100%; padding: 16px; background: #000; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: opacity 0.2s; }
+  .checkout-button:hover { opacity: 0.9; }
+  .secure-notice { display: flex; align-items: center; justify-content: center; gap: 6px; color: #777; font-size: 13px; margin-top: 12px; }
 </style>
 
 <script>
@@ -85,6 +134,8 @@
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     const shop = '{{ shop.permanent_domain }}';
+    // IMPORTANT: Get store currency or default to USD
+    const storeCurrency = '{{ shop.currency }}' || 'USD';
     
     // UPDATE THIS IF NEEDED
     const appUrl = 'https://draft-order-app-rk3s.onrender.com';
@@ -93,21 +144,18 @@
 
     if (!token) {
        document.getElementById('order-error').style.display = 'block';
-       document.getElementById('error-message').textContent = 'Missing Token in URL';
+       document.getElementById('error-message').textContent = 'Invalid Link: Missing Token.';
        document.getElementById('order-loading').style.display = 'none';
        return;
     }
 
+    // Initialize UI
+    document.getElementById('currency-code').textContent = storeCurrency;
+
     // Fetch Order
-    fetch(`${appUrl}/api/get-order?token=${token}&shop=${shop}`, {
-        mode: 'cors',
-        credentials: 'omit',
-        headers: { 'Content-Type': 'application/json' }
-    })
+    fetch(`${appUrl}/api/get-order?token=${token}&shop=${shop}`)
     .then(res => res.json())
     .then(data => {
-        console.log("API Response:", data); // Check Console for this!
-
         if (data.success) {
             orderData = data;
             renderOrder(data);
@@ -119,61 +167,99 @@
         console.error(err);
         document.getElementById('order-loading').style.display = 'none';
         document.getElementById('order-error').style.display = 'block';
-        document.getElementById('error-message').textContent = err.message;
+        document.getElementById('error-message').textContent = "We couldn't load this order. It may have expired.";
     });
 
     function renderOrder(data) {
         document.getElementById('order-loading').style.display = 'none';
         document.getElementById('order-content').style.display = 'grid';
 
-        // 1. Image
-        const imgEl = document.getElementById('product-image');
-        if (data.productImage) {
-            imgEl.src = data.productImage;
-            imgEl.style.display = 'block';
-        } else {
-            document.querySelector('.product-image-wrapper').innerHTML = '<p>No Image Available</p>';
+        // --- 1. SLIDER LOGIC (VIDEO FIRST) ---
+        const track = document.getElementById('media-track');
+        track.innerHTML = ''; // Clear previous
+        
+        let mediaCount = 0;
+
+        // A. Video (Highest Priority)
+        if (data.video) {
+            const vidItem = document.createElement('div');
+            vidItem.className = 'media-item';
+            vidItem.innerHTML = `<video controls playsinline><source src="${data.video}" type="video/mp4"></video>`;
+            track.appendChild(vidItem);
+            mediaCount++;
         }
 
-        // 2. Title
-        document.getElementById('product-title').textContent = data.productTitle;
+        // B. Images (Loop through array)
+        let imagesList = [];
+        if (Array.isArray(data.images)) {
+            imagesList = data.images;
+        } else if (data.productImage) {
+            // Fallback for old data
+            imagesList = [data.productImage]; 
+        }
 
-        // 3. Option Groups (Dropdowns)
+        imagesList.forEach(imgUrl => {
+            const imgItem = document.createElement('div');
+            imgItem.className = 'media-item';
+            imgItem.innerHTML = `<img src="${imgUrl}" alt="Custom Product">`;
+            track.appendChild(imgItem);
+            mediaCount++;
+        });
+
+        // C. Slider Controls (Hide arrows if only 1 item)
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+
+        if (mediaCount > 1) {
+            prevBtn.style.display = 'block';
+            nextBtn.style.display = 'block';
+            
+            // Scroll Logic
+            nextBtn.onclick = () => track.scrollBy({ left: track.offsetWidth, behavior: 'smooth' });
+            prevBtn.onclick = () => track.scrollBy({ left: -track.offsetWidth, behavior: 'smooth' });
+        } else if (mediaCount === 0) {
+           // Fallback if NO media exists
+           track.innerHTML = '<div class="media-item"><p>No Preview Available</p></div>';
+        }
+
+        // --- 2. TEXT DETAILS ---
+        document.getElementById('product-title').textContent = data.productTitle;
+        document.getElementById('product-note').textContent = data.note || "";
+
+        // --- 3. OPTIONS ---
         const container = document.getElementById('options-container');
         container.innerHTML = '';
 
         if (!data.optionGroups || data.optionGroups.length === 0) {
-            container.innerHTML = '<p style="color:red">No options found. Please recreate the order.</p>';
-            return;
-        }
+            // If no options, set base price and hide dropdowns
+            updatePrice();
+        } else {
+            data.optionGroups.forEach(group => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'option-group';
+                
+                const label = document.createElement('label');
+                label.className = 'option-label';
+                label.textContent = group.name;
+                
+                const select = document.createElement('select');
+                select.className = 'option-select';
+                
+                group.values.forEach(val => {
+                    const opt = document.createElement('option');
+                    opt.value = val.label;
+                    opt.dataset.price = val.price;
+                    opt.textContent = `${val.label} (+${val.price} ${storeCurrency})`;
+                    select.appendChild(opt);
+                });
 
-        data.optionGroups.forEach(group => {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'option-group';
-            
-            const label = document.createElement('label');
-            label.className = 'option-label';
-            label.textContent = group.name;
-            
-            const select = document.createElement('select');
-            select.className = 'option-select';
-            select.dataset.group = group.name;
-            
-            group.values.forEach(val => {
-                const opt = document.createElement('option');
-                opt.value = val.label;
-                opt.dataset.price = val.price;
-                opt.textContent = `${val.label} (+$${val.price})`;
-                select.appendChild(opt);
+                select.addEventListener('change', updatePrice);
+                wrapper.appendChild(label);
+                wrapper.appendChild(select);
+                container.appendChild(wrapper);
             });
-
-            select.addEventListener('change', updatePrice);
-            wrapper.appendChild(label);
-            wrapper.appendChild(select);
-            container.appendChild(wrapper);
-        });
-
-        updatePrice();
+            updatePrice(); // Initial calc
+        }
     }
 
     function updatePrice() {
@@ -182,16 +268,26 @@
             const opt = sel.options[sel.selectedIndex];
             total += parseFloat(opt.dataset.price || 0);
         });
-        document.getElementById('product-price').textContent = '$' + total.toFixed(2);
+        document.getElementById('product-price').textContent = total.toFixed(2);
     }
     
-    // Checkout Handler
+    // --- 4. CHECKOUT ---
     document.getElementById('checkout-button').addEventListener('click', () => {
-        const selects = document.querySelectorAll('.option-select');
-        if(selects.length === 0) return;
+        const btn = document.getElementById('checkout-button');
+        const errBox = document.getElementById('checkout-error');
+        
+        btn.disabled = true;
+        btn.textContent = "Processing...";
+        errBox.style.display = 'none';
 
-        const variantName = Array.from(selects).map(s => s.value).join(' / ');
-        const price = document.getElementById('product-price').textContent.replace('$','');
+        // Collect Variants
+        const selects = document.querySelectorAll('.option-select');
+        let variantName = "Custom Selection";
+        if (selects.length > 0) {
+            variantName = Array.from(selects).map(s => s.value).join(' / ');
+        }
+
+        const price = document.getElementById('product-price').textContent;
 
         fetch(`${appUrl}/api/process-checkout`, {
             method: 'POST',
@@ -202,13 +298,25 @@
                 draftOrderId: orderData.draftOrderId,
                 variantName: variantName,
                 price: price,
-                shop: shop
+                shop: shop,
+                currency: storeCurrency,
+                // Send the first image as the thumbnail for reference
+                customImage: orderData.images && orderData.images.length > 0 ? orderData.images[0] : null
             })
         })
         .then(res => res.json())
         .then(data => {
-            if(data.checkoutUrl) window.location.href = data.checkoutUrl;
-            else alert('Checkout failed: ' + (data.error || 'Unknown error'));
+            if(data.checkoutUrl) {
+                window.location.href = data.checkoutUrl;
+            } else {
+                throw new Error(data.error || 'Checkout failed');
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.textContent = "Proceed to Checkout";
+            errBox.style.display = 'block';
+            errBox.textContent = err.message;
         });
     });
 

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { useLoaderData, useFetcher } from "react-router"; // FIXED IMPORT
+import { useLoaderData, useFetcher } from "react-router"; 
 import {
   Page,
   Card,
@@ -13,19 +13,42 @@ import {
   Select,
   Divider,
   Box,
-  Text
+  Text,
+  DropZone
 } from "@shopify/polaris";
-import { DeleteIcon, PlusIcon, SaveIcon } from "@shopify/polaris-icons";
+import { DeleteIcon, PlusIcon, SaveIcon, ImageIcon, PlayIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 
+// --- 1. LOADER: FETCH CURRENCY ---
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  // Return plain object in React Router v7
-  return { shop: session.shop };
+  const { session, admin } = await authenticate.admin(request);
+  
+  // Query Shopify to get the Money Format (e.g. "£{{amount}}")
+  const response = await admin.graphql(`
+    query {
+      shop {
+        currencyFormats {
+          moneyFormat
+        }
+      }
+    }
+  `);
+
+  const data = await response.json();
+  const moneyFormat = data.data.shop.currencyFormats.moneyFormat;
+  
+  // Extract the symbol by removing {{amount}} and HTML tags
+  const currencySymbol = moneyFormat
+    .replace("{{amount}}", "")
+    .replace(/<[^>]*>/g, "") // Remove <span> tags if any
+    .trim();
+
+  return { shop: session.shop, currencySymbol };
 };
 
 export default function Index() {
-  const { shop } = useLoaderData(); 
+  // Get currencySymbol from loader
+  const { shop, currencySymbol } = useLoaderData(); 
   const fetcher = useFetcher();
 
   const [formData, setFormData] = useState({
@@ -33,8 +56,8 @@ export default function Index() {
     customerName: "",
     productTitle: "",
     note: "",
-    productImage: null,
-    productImagePreview: null,
+    images: [], 
+    video: null,
   });
 
   const [optionGroups, setOptionGroups] = useState([
@@ -55,7 +78,6 @@ export default function Index() {
   const [errorMessage, setErrorMessage] = useState("");
   const [generatedLink, setGeneratedLink] = useState("");
 
-  // Fetch Templates on Load
   useEffect(() => {
     if (shop) {
       fetch(`/api/templates?shop=${shop}`)
@@ -71,44 +93,85 @@ export default function Index() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   }, []);
 
-  // --- Image Handlers ---
+  // --- Image Logic ---
   const handleImageUpload = (event) => {
-    const file = event.target.files[0];
-    if (file) {
+    const files = Array.from(event.target.files);
+    let newImages = [];
+    let error = "";
+
+    if (formData.images.length + files.length > 2) {
+      setErrorMessage("You can only upload a maximum of 2 images.");
+      return;
+    }
+
+    files.forEach((file) => {
       if (!file.type.startsWith('image/')) {
-        setErrorMessage('Please upload an image file');
+        error = 'Only image files are allowed.';
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        setErrorMessage('Image size should be less than 5MB');
+        error = 'Image size should be less than 5MB';
         return;
       }
-      setFormData(prev => ({
-        ...prev,
-        productImage: file,
-        productImagePreview: URL.createObjectURL(file)
-      }));
-    }
-  };
+      newImages.push({
+        file,
+        preview: URL.createObjectURL(file)
+      });
+    });
 
-  const removeImage = () => {
-    if (formData.productImagePreview) {
-      URL.revokeObjectURL(formData.productImagePreview);
+    if (error) {
+      setErrorMessage(error);
+      return;
     }
+
     setFormData(prev => ({
       ...prev,
-      productImage: null,
-      productImagePreview: null
+      images: [...prev.images, ...newImages]
     }));
+  };
+
+  const removeImage = (index) => {
+    setFormData(prev => {
+      const updatedImages = [...prev.images];
+      URL.revokeObjectURL(updatedImages[index].preview); 
+      updatedImages.splice(index, 1);
+      return { ...prev, images: updatedImages };
+    });
+  };
+
+  // --- Video Logic ---
+  const handleVideoUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('video/')) {
+      setErrorMessage('Please upload a valid video file.');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      setErrorMessage('Video size should be less than 20MB');
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      video: {
+        file,
+        preview: URL.createObjectURL(file)
+      }
+    }));
+  };
+
+  const removeVideo = () => {
+    if (formData.video?.preview) {
+      URL.revokeObjectURL(formData.video.preview);
+    }
+    setFormData(prev => ({ ...prev, video: null }));
   };
 
   // --- Option Group Logic ---
   const addGroup = () => {
-    setOptionGroups([...optionGroups, { 
-      id: Date.now(), 
-      name: "", 
-      values: [{ id: Date.now() + 1, label: "", price: "0" }] 
-    }]);
+    setOptionGroups([...optionGroups, { id: Date.now(), name: "", values: [{ id: Date.now() + 1, label: "", price: "0" }] }]);
   };
 
   const removeGroup = (idx) => {
@@ -141,7 +204,7 @@ export default function Index() {
     setOptionGroups(newGroups);
   };
 
-  // --- Template Loading Logic ---
+  // --- Template Logic ---
   const handleLoadTemplate = (templateId) => {
     const template = templates.find(t => t.id == templateId);
     if (template) {
@@ -152,6 +215,16 @@ export default function Index() {
       setOptionGroups(template.optionGroups || []);
       setSelectedTemplate(templateId);
     }
+  };
+
+  // --- File to Base64 ---
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
   // --- Submit Logic ---
@@ -177,39 +250,57 @@ export default function Index() {
         return;
       }
 
-      // Upload image to Cloudinary
-      let imageUrl = null;
-      if (formData.productImage) {
-        const imageBase64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(formData.productImage);
-        });
-
+      // -- A. Upload Images --
+      const uploadedImageUrls = [];
+      for (const imgObj of formData.images) {
+        const imageBase64 = await fileToBase64(imgObj.file);
+        
         const uploadResponse = await fetch("/api/upload-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: imageBase64 }),
+          body: JSON.stringify({ image: imageBase64, type: 'image' }),
         });
 
         const uploadData = await uploadResponse.json();
         if (uploadData.success) {
-          imageUrl = uploadData.imageUrl;
+          uploadedImageUrls.push(uploadData.imageUrl);
         } else {
           throw new Error("Failed to upload image: " + uploadData.error);
         }
       }
 
+      // -- B. Upload Video --
+      let uploadedVideoUrl = null;
+      if (formData.video) {
+        const videoBase64 = await fileToBase64(formData.video.file);
+        
+        const uploadResponse = await fetch("/api/upload-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: videoBase64, type: 'video' }), 
+        });
+
+        const uploadData = await uploadResponse.json();
+        if (uploadData.success) {
+          uploadedVideoUrl = uploadData.imageUrl;
+        } else {
+          throw new Error("Failed to upload video: " + uploadData.error);
+        }
+      }
+
+      // -- C. Prepare Payload --
       const payload = {
         customerEmail: formData.customerEmail,
         customerName: formData.customerName,
         productTitle: formData.productTitle,
         note: formData.note,
         optionGroups: optionGroups,
-        productImage: imageUrl,
+        images: uploadedImageUrls, 
+        video: uploadedVideoUrl,
         isTemplate: saveAsTemplate,
-        templateName: saveAsTemplate ? templateName : null
+        templateName: saveAsTemplate ? templateName : null,
+        // Optional: Pass currency if your backend needs it to create draft order in correct currency
+        currency: currencySymbol 
       };
 
       const response = await fetch("/api/draft-order", {
@@ -244,7 +335,6 @@ export default function Index() {
     <Page title="Custom Order Builder">
       <BlockStack gap="500">
         
-        {/* Messages */}
         {successMessage && (
           <Banner title="Success" tone="success" onDismiss={() => setSuccessMessage("")}>
             <p>{successMessage}</p>
@@ -306,36 +396,76 @@ export default function Index() {
                 />
               </FormLayout.Group>
 
-              <div>
-                <p style={{marginBottom: '8px', fontWeight: 500}}>Product Image</p>
-                {formData.productImagePreview ? (
-                  <BlockStack gap="300">
-                    <Thumbnail source={formData.productImagePreview} alt="Preview" size="large" />
-                    <Button onClick={removeImage} icon={DeleteIcon}>Remove Image</Button>
-                  </BlockStack>
-                ) : (
-                  <input type="file" accept="image/*" onChange={handleImageUpload} />
+              <Divider />
+
+              {/* Images Section */}
+              <Text variant="headingSm" as="h3">Product Images (Max 2)</Text>
+              
+              <InlineStack gap="400" align="start">
+                {formData.images.map((img, index) => (
+                  <div key={index} style={{position: 'relative'}}>
+                     <Thumbnail source={img.preview} alt={`Preview ${index}`} size="large" />
+                     <div style={{position: 'absolute', top: -10, right: -10}}>
+                       <Button icon={DeleteIcon} size="micro" tone="critical" onClick={() => removeImage(index)} />
+                     </div>
+                  </div>
+                ))}
+
+                {formData.images.length < 2 && (
+                  <div style={{ width: '80px', height: '80px', border: '1px dashed #ccc', borderRadius: '4px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', position: 'relative' }}>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleImageUpload} 
+                      style={{position: 'absolute', width: '100%', height: '100%', opacity: 0, cursor: 'pointer'}} 
+                    />
+                    <ImageIcon fill="#5c5f62" />
+                  </div>
                 )}
-              </div>
+              </InlineStack>
+
+              <div style={{ height: '10px' }}></div>
+
+              {/* Video Section (Fixed Layout) */}
+              <Text variant="headingSm" as="h3">Product Video (Max 1)</Text>
+              {formData.video ? (
+                <BlockStack gap="200" align="start">
+                  <video src={formData.video.preview} controls style={{ maxWidth: '300px', maxHeight: '200px', borderRadius: '8px' }} />
+                  <Button icon={DeleteIcon} tone="critical" onClick={removeVideo}>Remove Video</Button>
+                </BlockStack>
+              ) : (
+                <div style={{ maxWidth: '300px', padding: '20px', border: '1px dashed #ccc', borderRadius: '4px', textAlign: 'center', position: 'relative' }}>
+                  <InlineStack align="center" gap="200">
+                     <PlayIcon /> 
+                     <Text>Upload Video</Text>
+                  </InlineStack>
+                  <input 
+                    type="file" 
+                    accept="video/*" 
+                    onChange={handleVideoUpload} 
+                    style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer'}} 
+                  />
+                </div>
+              )}
 
               <Divider />
 
-              {/* Option Group Builder */}
+              {/* Variant Options with Dynamic Currency */}
               <Text variant="headingMd" as="h2">Variant Options</Text>
               
               {optionGroups.map((group, groupIdx) => (
                 <div key={group.id} style={{background: '#f7f7f7', padding: '15px', borderRadius: '8px', border: '1px solid #e1e3e5'}}>
                   <BlockStack gap="300">
                     <InlineStack align="space-between">
-                       <div style={{width: '70%'}}>
-                         <TextField 
-                           label="Option Name (e.g. Dimensions)" 
-                           value={group.name} 
-                           onChange={(v) => updateGroup(groupIdx, 'name', v)} 
-                           autoComplete="off"
-                         />
-                       </div>
-                       <Button icon={DeleteIcon} tone="critical" onClick={() => removeGroup(groupIdx)}>Remove Group</Button>
+                        <div style={{width: '70%'}}>
+                          <TextField 
+                            label="Option Name (e.g. Dimensions)" 
+                            value={group.name} 
+                            onChange={(v) => updateGroup(groupIdx, 'name', v)} 
+                            autoComplete="off"
+                          />
+                        </div>
+                        <Button icon={DeleteIcon} tone="critical" onClick={() => removeGroup(groupIdx)}>Remove Group</Button>
                     </InlineStack>
 
                     <Text variant="bodySm" as="p" fontWeight="bold">Values</Text>
@@ -345,7 +475,15 @@ export default function Index() {
                            <TextField placeholder="Label (e.g. 10x10)" value={val.label} onChange={(v) => updateValue(groupIdx, valIdx, 'label', v)} autoComplete="off" />
                         </div>
                         <div style={{flex: 1}}>
-                           <TextField type="number" prefix="$" placeholder="Price" value={val.price} onChange={(v) => updateValue(groupIdx, valIdx, 'price', v)} autoComplete="off" />
+                           {/* 2. DYNAMIC CURRENCY SYMBOL USED HERE */}
+                           <TextField 
+                                type="number" 
+                                prefix={currencySymbol} // <--- Shows £, €, etc.
+                                placeholder="Price" 
+                                value={val.price} 
+                                onChange={(v) => updateValue(groupIdx, valIdx, 'price', v)} 
+                                autoComplete="off" 
+                           />
                         </div>
                         <Button icon={DeleteIcon} onClick={() => removeValue(groupIdx, valIdx)} />
                       </InlineStack>
@@ -373,14 +511,14 @@ export default function Index() {
               {/* Action Buttons */}
               <InlineStack align="space-between" gap="400">
                  <InlineStack gap="200">
-                    <div style={{width: '200px'}}>
-                      <TextField placeholder="Template Name" value={templateName} onChange={setTemplateName} autoComplete="off" />
-                    </div>
-                    <Button icon={SaveIcon} onClick={() => handleSubmit(true)} loading={loading && isTemplateSave}>Save as Template</Button>
+                   <div style={{width: '200px'}}>
+                     <TextField placeholder="Template Name" value={templateName} onChange={setTemplateName} autoComplete="off" />
+                   </div>
+                   <Button icon={SaveIcon} onClick={() => handleSubmit(true)} loading={loading && isTemplateSave}>Save as Template</Button>
                  </InlineStack>
 
                  <Button variant="primary" size="large" onClick={() => handleSubmit(false)} loading={loading && !isTemplateSave}>
-                    Create Customer Link
+                   Create Customer Link
                  </Button>
               </InlineStack>
 
