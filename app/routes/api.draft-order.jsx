@@ -1,4 +1,5 @@
-import db, { getNextNpdfId } from "../db.server";
+import { randomUUID } from "crypto";
+import db from "../db.server";
 import { authenticate } from "../shopify.server";
 
 export async function action({ request }) {
@@ -59,10 +60,10 @@ export async function action({ request }) {
 
     } else {
       // --- SAVE AS ORDER BLOCK IN OUR DB ---
-      const newNpdfId = await getNextNpdfId();
+      const newId = randomUUID();
       const createdRecord = await db.orderBlock.create({
         data: {
-          id: newNpdfId, // Assign the generated ID
+          id: newId, // Assign the generated ID
           shop,
           productTitle,
           customerName: customerName || "",

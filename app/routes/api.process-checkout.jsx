@@ -2,58 +2,59 @@
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
 
-// 1. Define CORS Headers
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+// Helper to construct a CORS-enabled response for a specific shop
+const createCorsResponse = (shop, data, status = 200) => {
+  const origin = `https://${shop}`;
+  const headers = {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Content-Type": "application/json",
+  };
+  return new Response(JSON.stringify(data), { status, headers });
 };
 
-// 2. Handle OPTIONS (Pre-flight)
+// Handle OPTIONS (Pre-flight) by trying to read the shop from the body if possible
 export async function loader({ request }) {
+  // For OPTIONS, we might not have a body, but we can try to get the origin header.
+  // A more robust solution might involve a fixed list of allowed origins if the shop is not available.
+  // However, for this app, we'll rely on the shop being sent in the actual request.
+  const origin = request.headers.get("Origin");
+  const headers = {
+    "Access-Control-Allow-Origin": origin || "*", // Fallback for safety, but browser should send Origin
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
   if (request.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: headers, status: 204 });
   }
-  return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
+  return new Response("Method Not Allowed", { status: 405, headers: headers });
 }
+
 
 // 3. Handle POST
 export async function action({ request }) {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  const jsonResponse = (data, status = 200) => {
-    return new Response(JSON.stringify(data), {
-      status,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
-  };
-
+  let shopFromClient = "";
   try {
     const body = await request.json();
-    const { id, variantName, price, shop: shopFromClient, customImage } = body;
+    shopFromClient = body.shop; // Keep shop for CORS response even on error
 
     // 1. Validate inputs
-    if (!id || !price || !shopFromClient) {
-      return jsonResponse({ success: false, error: "Missing ID, shop, or price" }, 400);
+    if (!body.id || !body.price || !shopFromClient) {
+      return createCorsResponse(shopFromClient || "*", { success: false, error: "Missing ID, shop, or price" }, 400);
     }
 
     // 2. Fetch OrderBlock from our DB
     const orderBlock = await db.orderBlock.findUnique({
-      where: { id: id },
+      where: { id: body.id, shop: shopFromClient }, // Validate shop ownership
     });
 
     if (!orderBlock) {
-      return jsonResponse({ success: false, error: "Custom order not found" }, 404);
+      return createCorsResponse(shopFromClient, { success: false, error: "Custom order not found" }, 404);
     }
     
-    // If a Shopify Draft Order already exists for this OrderBlock and it's not purchased,
-    // we can redirect to the existing checkout URL or update it.
-    // For now, let's create a new one to simplify the flow as per the new requirement.
-    // If orderBlock.checkoutUrl exists, we can perhaps just return that for idempotency.
     if (orderBlock.checkoutUrl && !orderBlock.isPurchased) {
-        return jsonResponse({ success: true, checkoutUrl: orderBlock.checkoutUrl });
+        return createCorsResponse(shopFromClient, { success: true, checkoutUrl: orderBlock.checkoutUrl });
     }
 
     // 3. Authenticate with Shopify
@@ -81,18 +82,18 @@ export async function action({ request }) {
     });
 
     // Add selected variantName and customImage
-    if (variantName) {
-      lineItemCustomAttributes.push({ key: "Selected Options", value: variantName });
+    if (body.variantName) {
+      lineItemCustomAttributes.push({ key: "Selected Options", value: body.variantName });
     }
-    if (customImage) {
-      lineItemCustomAttributes.push({ key: "Preview Image", value: customImage });
+    if (body.customImage) {
+      lineItemCustomAttributes.push({ key: "Preview Image", value: body.customImage });
     }
 
     const lineItems = [
       {
         title: orderBlock.productTitle || "Custom Product",
         quantity: 1,
-        originalUnitPrice: price, // 'price' from frontend is the final selected price
+        originalUnitPrice: body.price,
         customAttributes: lineItemCustomAttributes,
       },
     ];
@@ -127,14 +128,12 @@ export async function action({ request }) {
       input: {
         lineItems: lineItems,
         customer: customerInput,
-        note: orderBlock.note + (variantName ? `\nSelected by customer: ${variantName}` : ""),
-        tags: [`draft-order-app-id-${id}`], // Link to our internal OrderBlock ID
+        note: orderBlock.note + (body.variantName ? `\nSelected by customer: ${body.variantName}` : ""),
+        tags: [`draft-order-app-id-${body.id}`],
       },
     };
     
-    console.log("DEBUG: draftOrderInput sent to Shopify for creation:", JSON.stringify(draftOrderInput, null, 2));
-
-    const response = await admin.graphql(createDraftOrderMutation, draftOrderInput);
+    const response = await admin.graphql(createDraftOrderMutation, { variables: draftOrderInput });
     const responseJson = await response.json();
 
     if (responseJson.errors) {
@@ -144,33 +143,28 @@ export async function action({ request }) {
     if (responseJson.data.draftOrderCreate.userErrors.length > 0) {
       const userErrors = responseJson.data.draftOrderCreate.userErrors;
       console.error("Shopify Draft Order creation user errors:", JSON.stringify(userErrors, null, 2));
-      const formattedErrors = userErrors.map(err => {
-        return `${err.field ? `Field '${err.field.join(".")}'`: "General"}: ${err.message}`;
-      }).join("; ");
+      const formattedErrors = userErrors.map(err => `${err.field ? `Field '${err.field.join(".")}'`: "General"}: ${err.message}`).join("; ");
       throw new Error("Shopify Draft Order creation failed: " + formattedErrors);
     }
 
     const shopifyDraftOrder = responseJson.data.draftOrderCreate.draftOrder;
-    const shopifyDraftOrderId = shopifyDraftOrder.id;
-    const checkoutUrl = shopifyDraftOrder.invoiceUrl;
-
-    // 6. UPDATE OUR ORDER BLOCK WITH SHOPIFY DRAFT ORDER DETAILS
+    
     await db.orderBlock.update({
-      where: { id: id },
+      where: { id: body.id },
       data: {
-        shopifyDraftOrderId: shopifyDraftOrderId,
-        checkoutUrl: checkoutUrl,
-        isPurchased: false, // Newly created Draft Order is not yet purchased
+        shopifyDraftOrderId: shopifyDraftOrder.id,
+        checkoutUrl: shopifyDraftOrder.invoiceUrl,
+        isPurchased: false,
       },
     });
 
-    return jsonResponse({
+    return createCorsResponse(shopFromClient, {
       success: true,
-      checkoutUrl: checkoutUrl,
+      checkoutUrl: shopifyDraftOrder.invoiceUrl,
     });
 
   } catch (error) {
     console.error("Checkout Server Error:", error);
-    return jsonResponse({ success: false, error: "Server error processing checkout: " + error.message }, 500);
+    return createCorsResponse(shopFromClient || "*", { success: false, error: "Server error processing checkout: " + error.message }, 500);
   }
 }

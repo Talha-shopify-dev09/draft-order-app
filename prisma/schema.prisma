@@ -56,9 +56,3 @@ model Template {
   images        String?  @default("[]")
   createdAt     DateTime @default(now())
 }
-
-// New model for app settings, including ID counter
-model AppSetting {
-  key   String @id @unique
-  value String
-}

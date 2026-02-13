@@ -1,45 +1,48 @@
 // app/routes/api.get-order.jsx
 import db from "../db.server";
 
-// 1. CORS Headers (Allow frontend to talk to backend)
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+// Helper to construct a CORS-enabled response for a specific shop
+const createCorsResponse = (shop, data, status = 200) => {
+  const origin = `https://${shop}`;
+  const headers = {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Content-Type": "application/json",
+  };
+  return new Response(JSON.stringify(data), { status, headers });
 };
 
 export async function loader({ request }) {
-  // Handle Browser Pre-check (OPTIONS request)
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
-  
-  // Helper for JSON response (No Remix 'json' helper used)
-  const jsonResponse = (data, status = 200) => {
-    return new Response(JSON.stringify(data), {
-      status,
-      headers: { "Content-Type": "application/json", ...corsHeaders }
-    });
-  };
+  const shop = url.searchParams.get("shop");
 
+  // Ensure shop is provided for security
+  if (!shop) {
+    return new Response("Missing 'shop' parameter", { status: 400 });
+  }
+
+  // Handle Browser Pre-check (OPTIONS request)
+  if (request.method === "OPTIONS") {
+    return createCorsResponse(shop, null, 204);
+  }
+  
   if (!id) {
     console.warn("[API] Missing ID in request to api/get-order.");
-    return jsonResponse({ success: false, error: "Missing ID" }, 400);
+    return createCorsResponse(shop, { success: false, error: "Missing ID" }, 400);
   }
 
   try {
-    console.log(`[API] Searching for OrderBlock with ID: ${id}`);
+    console.log(`[API] Searching for OrderBlock with ID: ${id} for shop: ${shop}`);
 
     const order = await db.orderBlock.findUnique({
-      where: { id: id },
+      where: { id: id, shop: shop }, // Ensure the order belongs to the shop
     });
 
     if (!order) {
       console.error(`[API] Order not found in DB for ID: ${id}`);
-      return jsonResponse({ success: false, error: "Order not found or expired" }, 404);
+      return createCorsResponse(shop, { success: false, error: "Order not found or expired" }, 404);
     }
     console.log(`[API] Order found for ID: ${id}`);
 
@@ -63,7 +66,7 @@ export async function loader({ request }) {
     }
 
     // 4. RETURN DATA
-    return jsonResponse({
+    return createCorsResponse(shop, {
       success: true,
       productTitle: order.productTitle,
       note: order.note,
@@ -77,6 +80,6 @@ export async function loader({ request }) {
 
   } catch (error) {
     console.error("API Error:", error);
-    return jsonResponse({ success: false, error: "Server error: " + error.message }, 500);
+    return createCorsResponse(shop, { success: false, error: "Server error: " + error.message }, 500);
   }
 }
