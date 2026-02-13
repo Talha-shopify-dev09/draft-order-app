@@ -15,7 +15,7 @@ export async function loader({ request }) {
   }
 
   const url = new URL(request.url);
-  const token = url.searchParams.get("token");
+  const id = url.searchParams.get("id");
   
   // Helper for JSON response (No Remix 'json' helper used)
   const jsonResponse = (data, status = 200) => {
@@ -25,21 +25,21 @@ export async function loader({ request }) {
     });
   };
 
-  if (!token) {
-    return jsonResponse({ success: false, error: "Missing token" }, 400);
+  if (!id) {
+    return jsonResponse({ success: false, error: "Missing ID" }, 400);
   }
 
   try {
-    console.log(`[API] Looking up order in DB with ID: ${token}`);
+    console.log(`[API] Looking up order in DB with ID: ${id}`);
 
     // 2. FIND ORDER IN DATABASE
-    // We search by the ID directly (which is the token in the URL)
+    // We search by the ID directly
     const order = await db.orderBlock.findUnique({
-      where: { id: token },
+      where: { id: id },
     });
 
     if (!order) {
-      console.error(`[API] Order not found for ID: ${token}`);
+      console.error(`[API] Order not found for ID: ${id}`);
       return jsonResponse({ success: false, error: "Order not found or expired" }, 404);
     }
 

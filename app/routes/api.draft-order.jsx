@@ -1,4 +1,4 @@
-import db from "../db.server";
+import db, { getNextNpdfId } from "../db.server";
 import { authenticate } from "../shopify.server";
 
 export async function action({ request }) {
@@ -59,8 +59,10 @@ export async function action({ request }) {
 
     } else {
       // --- SAVE AS ORDER BLOCK IN OUR DB ---
+      const newNpdfId = await getNextNpdfId();
       const createdRecord = await db.orderBlock.create({
         data: {
+          id: newNpdfId, // Assign the generated ID
           shop,
           productTitle,
           customerName: customerName || "",
@@ -69,141 +71,13 @@ export async function action({ request }) {
           optionGroups: optionsString,
           images: imagesString,
           video: video || null,
+          // shopifyDraftOrderId, isPurchased, checkoutUrl will be set later at checkout
         },
       });
 
-      // --- CALCULATE TOTAL PRICE ---
-      let totalPrice = 0;
-      optionGroups.forEach(group => {
-        group.values.forEach(val => {
-          totalPrice += parseFloat(val.price || 0);
-        });
-      });
-      // Ensure a base price if no options or price is 0
-      if (totalPrice === 0) {
-        totalPrice = 1.00; // Shopify Draft Orders require a positive price. Minimum 1.00.
-      }
-
-      // --- PREPARE LINE ITEMS FOR SHOPIFY DRAFT ORDER ---
-      const lineItemCustomAttributes = [];
-      optionGroups.forEach(group => {
-          group.values.forEach(val => {
-              lineItemCustomAttributes.push({ key: `${group.name} - ${val.label}`, value: val.price });
-          });
-      });
-
-      // Add main image as custom attribute if available
-      if (images && images.length > 0) {
-        lineItemCustomAttributes.push({ key: "Product Image", value: images[0] });
-      }
-      if (video) {
-        lineItemCustomAttributes.push({ key: "Product Video", value: video });
-      }
 
 
-      const lineItems = [
-        {
-          title: productTitle,
-          quantity: 1,
-          originalUnitPrice: totalPrice.toFixed(2),
-          customAttributes: lineItemCustomAttributes,
-        },
-      ];
-
-      // --- PREPARE CUSTOMER FOR SHOPIFY DRAFT ORDER ---
-      let customerInput = null;
-      if (customerEmail) {
-        customerInput = {
-          email: customerEmail,
-          firstName: customerName || "",
-          lastName: "", // Assuming no last name from current form
-        };
-      }
-
-      // --- CREATE SHOPIFY DRAFT ORDER ---
-      const createDraftOrderMutation = `
-        mutation draftOrderCreate($input: DraftOrderInput!) {
-          draftOrderCreate(input: $input) {
-            draftOrder {
-              id
-              invoiceUrl
-              customer {
-                id
-                email
-                displayName
-              }
-              lineItems {
-                nodes {
-                  title
-                  quantity
-                  originalUnitPrice
-
-                  customAttributes {
-                    key
-                    value
-                  }
-                }
-              }
-              tags
-            }
-            userErrors {
-              field
-              message
-            }
-          }
-        }
-      `;
-
-      const draftOrderInput = {
-        input: {
-          lineItems: lineItems,
-          customer: customerInput,
-          note: note,
-          tags: [`draft-order-app-id-${createdRecord.id}`], // Link to our internal OrderBlock ID
-        },
-      };
-      
-      const authResult = await authenticate.admin(request); // Get the full auth result
-      const admin = authResult.admin; // Explicitly get the admin client
-
-      if (!admin || typeof admin.graphql !== 'function') {
-        throw new Error("Shopify Admin GraphQL client is not available. Ensure proper authentication and setup.");
-      }
-
-      // Log the input to debug invalid value error
-      console.log("DEBUG: draftOrderInput sent to Shopify:", JSON.stringify(draftOrderInput, null, 2));
-      
-      const response = await admin.graphql(createDraftOrderMutation, draftOrderInput);
-      const responseJson = await response.json();
-
-      if (responseJson.errors) {
-        // Log the full graphQLErrors array for debugging
-        console.error("Shopify GraphQL API graphQLErrors:", JSON.stringify(responseJson.errors, null, 2));
-        throw new Error("Shopify GraphQL API error: " + responseJson.errors.map(err => err.message).join(", "));
-      }
-      if (responseJson.data.draftOrderCreate.userErrors.length > 0) {
-        const userErrors = responseJson.data.draftOrderCreate.userErrors;
-        console.error("Shopify Draft Order creation user errors:", JSON.stringify(userErrors, null, 2));
-        const formattedErrors = userErrors.map(err => {
-          return `${err.field ? `Field '${err.field.join(".")}'`: "General"}: ${err.message}`;
-        }).join("; ");
-        throw new Error("Shopify Draft Order creation failed: " + formattedErrors);
-      }
-
-      const shopifyDraftOrder = responseJson.data.draftOrderCreate.draftOrder;
-      const shopifyDraftOrderId = shopifyDraftOrder.id;
-      const checkoutUrl = shopifyDraftOrder.invoiceUrl;
-
-      // --- UPDATE OUR ORDER BLOCK WITH SHOPIFY DRAFT ORDER DETAILS ---
-      await db.orderBlock.update({
-        where: { id: createdRecord.id },
-        data: {
-          shopifyDraftOrderId: shopifyDraftOrderId,
-          checkoutUrl: checkoutUrl,
-        },
-      });
-
-      return Response.json({ success: true, customerLink: checkoutUrl });
+      return Response.json({ success: true, customerLink: `https://${shop}/pages/custom-order?id=${createdRecord.id}` });
     }
 
   } catch (error) {

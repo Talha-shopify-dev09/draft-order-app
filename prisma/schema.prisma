@@ -32,7 +32,7 @@ model Session {
 // --- ADDED MODELS BELOW ---
 
 model OrderBlock {
-  id                String    @id @default(uuid())
+  id                String    @id
   shop              String
   productTitle      String
   customerName      String?
@@ -41,9 +41,9 @@ model OrderBlock {
   optionGroups      String    @default("[]") // Stores JSON string of options
   images            String    @default("[]") // Stores JSON string of image URLs
   video             String?                 // Stores video URL
-  shopifyDraftOrderId String?                 // Stores the ID of the corresponding Shopify Draft Order
+  shopifyDraftOrderId String?                 // Stores the ID of the corresponding Shopify Draft Order (populated at checkout)
   isPurchased       Boolean   @default(false) // Tracks if the order has been purchased
-  checkoutUrl       String?                 // Stores the checkout URL of the Shopify Draft Order
+  checkoutUrl       String?                 // Stores the checkout URL of the Shopify Draft Order (populated at checkout)
   createdAt         DateTime  @default(now())
 }
 
@@ -55,4 +55,10 @@ model Template {
   optionGroups  String   @default("[]")
   images        String?  @default("[]")
   createdAt     DateTime @default(now())
+}
+
+// New model for app settings, including ID counter
+model AppSetting {
+  key   String @id @unique
+  value String
 }
