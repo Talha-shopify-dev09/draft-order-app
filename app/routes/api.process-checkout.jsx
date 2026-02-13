@@ -46,10 +46,11 @@ export async function action({ request }) {
 
     // 2. Fetch OrderBlock from our DB
     const orderBlock = await db.orderBlock.findUnique({
-      where: { id: body.id, shop: shopFromClient }, // Validate shop ownership
+      where: { id: body.id }, // Find by ID only
     });
 
-    if (!orderBlock) {
+    // Important Security Check: Verify that the order belongs to the requesting shop
+    if (!orderBlock || orderBlock.shop !== shopFromClient) {
       return createCorsResponse(shopFromClient, { success: false, error: "Custom order not found" }, 404);
     }
     

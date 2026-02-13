@@ -37,11 +37,12 @@ export async function loader({ request }) {
     console.log(`[API] Searching for OrderBlock with ID: ${id} for shop: ${shop}`);
 
     const order = await db.orderBlock.findUnique({
-      where: { id: id, shop: shop }, // Ensure the order belongs to the shop
+      where: { id: id }, // Find by ID only
     });
 
-    if (!order) {
-      console.error(`[API] Order not found in DB for ID: ${id}`);
+    // Important Security Check: Verify that the order belongs to the requesting shop
+    if (!order || order.shop !== shop) {
+      console.error(`[API] Order not found or shop mismatch for ID: ${id}`);
       return createCorsResponse(shop, { success: false, error: "Order not found or expired" }, 404);
     }
     console.log(`[API] Order found for ID: ${id}`);
