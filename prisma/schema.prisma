@@ -44,6 +44,8 @@ model OrderBlock {
   shopifyDraftOrderId String?                 // Stores the ID of the corresponding Shopify Draft Order (populated at checkout)
   isPurchased       Boolean   @default(false) // Tracks if the order has been purchased
   checkoutUrl       String?                 // Stores the checkout URL of the Shopify Draft Order (populated at checkout)
+  finalPrice        String?                 // Stores the final price at checkout
+  currencyCode      String?                 // Stores the currency code at checkout
   createdAt         DateTime  @default(now())
 }
 

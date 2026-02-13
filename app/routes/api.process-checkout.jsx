@@ -188,6 +188,8 @@ export async function action({ request }) {
         shopifyDraftOrderId: shopifyDraftOrder.id,
         checkoutUrl: shopifyDraftOrder.invoiceUrl,
         isPurchased: false,
+        finalPrice: priceAmount,
+        currencyCode: currencyCode,
       },
     });
 

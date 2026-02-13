@@ -132,6 +132,11 @@ export default function ListDraftOrders() {
                         <Text variant="bodyMd" color="subdued">
                           Created: {new Date(createdAt).toLocaleDateString()}
                         </Text>
+                        <Box>
+                          <Link url={`https://${shop}/pages/custom-order?id=${id}`} external>
+                            Customer Link
+                          </Link>
+                        </Box>
                         {checkoutUrl && (
                           <Box>
                             <Link url={checkoutUrl} external>View Checkout Page</Link>

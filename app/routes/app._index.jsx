@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router";
+import { useNavigate, useLoaderData } from "react-router";
 import {
   Page,
   Layout,
@@ -6,16 +6,74 @@ import {
   Button,
   BlockStack,
   Text,
-  MediaCard
+  MediaCard,
+  InlineStack
 } from "@shopify/polaris";
 import { PlusIcon, ViewIcon } from "@shopify/polaris-icons";
+import { authenticate } from "../shopify.server";
+import db from "../db.server";
+
+export const loader = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
+
+  const [purchased, activeLinks, checkoutPending] = await Promise.all([
+    db.orderBlock.findMany({
+      where: { shop, isPurchased: true },
+      select: { finalPrice: true, currencyCode: true },
+    }),
+    db.orderBlock.count({ where: { shop } }),
+    db.orderBlock.count({
+      where: { shop, isPurchased: false, checkoutUrl: { not: null } },
+    }),
+  ]);
+
+  let totalSales = 0;
+  let currency = "";
+  for (const o of purchased) {
+    const num = Number(o.finalPrice);
+    if (Number.isFinite(num)) {
+      totalSales += num;
+      if (!currency && o.currencyCode) currency = o.currencyCode;
+    }
+  }
+
+  return {
+    totalSales: totalSales.toFixed(2),
+    currency: currency || "USD",
+    activeLinks: activeLinks,
+    checkoutPending: checkoutPending,
+  };
+};
 
 export default function Index() {
   const navigate = useNavigate();
+  const { totalSales, currency, activeLinks, checkoutPending } = useLoaderData();
 
   return (
     <Page>
       <Layout>
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="300">
+              <Text variant="headingMd" as="h2">Sales Overview</Text>
+              <InlineStack gap="600">
+                <BlockStack gap="100">
+                  <Text variant="bodySm" as="p" color="subdued">Total Sales</Text>
+                  <Text variant="headingLg" as="p">{totalSales} {currency}</Text>
+                </BlockStack>
+                <BlockStack gap="100">
+                  <Text variant="bodySm" as="p" color="subdued">Active Draft Links</Text>
+                  <Text variant="headingLg" as="p">{activeLinks}</Text>
+                </BlockStack>
+                <BlockStack gap="100">
+                  <Text variant="bodySm" as="p" color="subdued">Checkout Links (Not Purchased)</Text>
+                  <Text variant="headingLg" as="p">{checkoutPending}</Text>
+                </BlockStack>
+              </InlineStack>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
         <Layout.Section>
           <MediaCard
             title="Manage Your Custom Orders"
