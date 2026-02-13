@@ -26,22 +26,22 @@ export async function loader({ request }) {
   };
 
   if (!id) {
+    console.warn("[API] Missing ID in request to api/get-order.");
     return jsonResponse({ success: false, error: "Missing ID" }, 400);
   }
 
   try {
-    console.log(`[API] Looking up order in DB with ID: ${id}`);
+    console.log(`[API] Searching for OrderBlock with ID: ${id}`);
 
-    // 2. FIND ORDER IN DATABASE
-    // We search by the ID directly
     const order = await db.orderBlock.findUnique({
       where: { id: id },
     });
 
     if (!order) {
-      console.error(`[API] Order not found for ID: ${id}`);
+      console.error(`[API] Order not found in DB for ID: ${id}`);
       return jsonResponse({ success: false, error: "Order not found or expired" }, 404);
     }
+    console.log(`[API] Order found for ID: ${id}`);
 
     // 3. PARSE DATA SAFELY
     // Database stores arrays as JSON strings, so we parse them back to arrays
