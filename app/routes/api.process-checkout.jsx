@@ -1,6 +1,6 @@
 // app/routes/api.process-checkout.jsx
 import db from "../db.server";
-import { authenticate } from "../shopify.server";
+import { authenticate, unauthenticated } from "../shopify.server";
 
 // Helper to construct a CORS-enabled response for a specific shop
 const createCorsResponse = (shop, data, status = 200) => {
@@ -58,8 +58,15 @@ export async function action({ request }) {
     }
 
     // 3. Authenticate with Shopify
-    const authResult = await authenticate.admin(request);
-    const admin = authResult.admin;
+    // App Proxy requests won't have an embedded session, so fall back to unauthenticated admin.
+    let admin;
+    try {
+      const authResult = await authenticate.admin(request);
+      admin = authResult.admin;
+    } catch (error) {
+      const unauth = await unauthenticated.admin(shopFromClient);
+      admin = unauth.admin;
+    }
 
     if (!admin || typeof admin.graphql !== 'function') {
       throw new Error("Shopify Admin GraphQL client is not available. Ensure proper authentication and setup.");
