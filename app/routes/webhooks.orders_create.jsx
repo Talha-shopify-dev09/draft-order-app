@@ -11,14 +11,23 @@ export const action = async ({ request }) => {
   }
 
   switch (topic) {
-    case "DRAFT_ORDERS_FINALIZED":
-      const shopifyDraftOrderId = `gid://shopify/DraftOrder/${payload.id}`;
-      console.log(`Received DRAFT_ORDERS_FINALIZED for Shopify Draft Order ID: ${shopifyDraftOrderId}`);
+    case "ORDERS_CREATE":
+      // Extract our internal OrderBlock ID from the order's tags
+      const orderTags = payload.tags || [];
+      const orderBlockIdTag = orderTags.find(tag => tag.startsWith("draft-order-app-id-"));
+
+      if (!orderBlockIdTag) {
+        console.warn(`ORDERS_CREATE webhook received but no matching 'draft-order-app-id-' tag found in order ${payload.id}`);
+        return new Response(JSON.stringify({ message: "No matching OrderBlock ID tag found" }), { headers: { "Content-Type": "application/json" }, status: 200 });
+      }
+
+      const internalOrderBlockId = orderBlockIdTag.replace("draft-order-app-id-", "");
+      console.log(`Received ORDERS_CREATE for Shopify Order ID: ${payload.id}, linked to internal OrderBlock ID: ${internalOrderBlockId}`);
 
       try {
         const updatedOrderBlock = await db.orderBlock.updateMany({
           where: {
-            shopifyDraftOrderId: shopifyDraftOrderId,
+            id: internalOrderBlockId, // Use our internal OrderBlock ID
             shop: shop,
           },
           data: {
@@ -27,13 +36,13 @@ export const action = async ({ request }) => {
         });
 
         if (updatedOrderBlock.count > 0) {
-          console.log(`Updated OrderBlock to isPurchased: true for Shopify Draft Order ID: ${shopifyDraftOrderId}`);
+          console.log(`Updated OrderBlock (ID: ${internalOrderBlockId}) to isPurchased: true.`);
         } else {
-          console.warn(`No matching OrderBlock found for Shopify Draft Order ID: ${shopifyDraftOrderId} in shop ${shop}`);
+          console.warn(`No matching OrderBlock found for internal ID: ${internalOrderBlockId} in shop ${shop}`);
         }
 
       } catch (error) {
-        console.error(`Error updating OrderBlock for DRAFT_ORDERS_FINALIZED webhook: ${error}`);
+        console.error(`Error updating OrderBlock for ORDERS_CREATE webhook: ${error}`);
         return new Response(JSON.stringify({ message: "Failed to process webhook" }), { headers: { "Content-Type": "application/json" }, status: 500 });
       }
       break;
