@@ -31,77 +31,95 @@ export async function action({ request }) {
 
   try {
     const body = await request.json();
-    const { token, variantName, price, shop, currency, customImage } = body;
+    const { token, variantName, price, shop: shopFromClient, customImage } = body; // shopFromClient is the shop from the liquid block
 
     // 1. Validate inputs
-    if (!shop || !price) {
-      return jsonResponse({ success: false, error: "Missing shop or price" }, 400);
+    if (!token || !price || !shopFromClient) {
+      return jsonResponse({ success: false, error: "Missing token, shop, or price" }, 400);
     }
 
-    // 2. Look up Session
-    const session = await db.session.findFirst({
-      where: { shop: shop },
+    // 2. Fetch OrderBlock from our DB
+    const orderBlock = await db.orderBlock.findUnique({
+      where: { id: token },
     });
 
-    if (!session || !session.accessToken) {
-      console.error(`No session found for shop: ${shop}`);
-      return jsonResponse({ success: false, error: "Shop not authorized" }, 401);
+    if (!orderBlock || !orderBlock.shopifyDraftOrderId) {
+      return jsonResponse({ success: false, error: "Custom order not found or invalid" }, 404);
     }
 
-    // 3. Prepare Line Item
-    const lineItem = {
-      title: variantName || "Custom Order",
-      price: price,
-      quantity: 1,
-      custom: true,
-      taxable: true,
-      properties: []
-    };
+    // 3. Authenticate with Shopify
+    const { admin } = await authenticate.admin(request);
 
+
+    // 4. Prepare Line Item for updating Shopify Draft Order
+    const lineItemCustomAttributes = [];
     if (customImage) {
-      lineItem.properties.push({ name: "Preview Image", value: customImage });
+      lineItemCustomAttributes.push({ key: "Preview Image", value: customImage });
     }
+    // Optionally, parse and add actual option groups here if you want to update them in the Draft Order's custom attributes
+    // For now, we'll just use variantName as a custom attribute or part of title
 
-    // 4. CREATE DRAFT ORDER
-    const createResponse = await fetch(
-      `https://${shop}/admin/api/2024-10/draft_orders.json`,
+    const lineItems = [
       {
-        method: "POST",
-        headers: {
-          "X-Shopify-Access-Token": session.accessToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          draft_order: {
-            line_items: [lineItem],
-            currency: currency || "USD",
-            use_customer_default_address: false,
-            
-            // --- FIX IS HERE ---
-            // 1. Use a short, simple tag
-            tags: "app_custom_order", 
-            
-            // 2. Put the long token in note_attributes (No 40 char limit here)
-            note_attributes: [
-              { name: "_app_token", value: token }
-            ]
-          },
-        }),
+        title: variantName || orderBlock.productTitle || "Custom Product",
+        quantity: 1,
+        originalUnitPrice: parseFloat(price),
+        customAttributes: lineItemCustomAttributes,
+      },
+    ];
+
+    // 5. Construct GraphQL Mutation for Draft Order Update
+    const draftOrderUpdateMutation = `
+      mutation draftOrderUpdate($id: ID!, $input: DraftOrderInput!) {
+        draftOrderUpdate(id: $id, input: $input) {
+          draftOrder {
+            id
+            invoiceUrl
+            totalPrice {
+              amount
+            }
+            lineItems(first: 1) {
+              nodes {
+                title
+                originalUnitPrice {
+                  amount
+                }
+                customAttributes {
+                  key
+                  value
+                }
+              }
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
       }
-    );
+    `;
 
-    const createData = await createResponse.json();
+    const draftOrderInput = {
+      id: orderBlock.shopifyDraftOrderId,
+      input: {
+        lineItems: lineItems,
+        // Update the note if necessary with more details from the selection
+        note: orderBlock.note + (variantName ? `\nSelected Options: ${variantName}` : ""),
+      },
+    };
+    
+    const response = await admin.graphql(draftOrderUpdateMutation, draftOrderInput);
+    const responseJson = await response.json();
 
-    // Catch Errors (Like the tag error you just saw)
-    if (!createResponse.ok) {
-      console.error("Shopify Creation Failed:", JSON.stringify(createData));
-      return jsonResponse({ success: false, error: JSON.stringify(createData) }, 500);
+    if (responseJson.errors || responseJson.data.draftOrderUpdate.userErrors.length > 0) {
+      const errors = responseJson.errors?.map(err => err.message) || responseJson.data.draftOrderUpdate.userErrors.map(err => err.message);
+      throw new Error("Shopify Draft Order update failed: " + errors.join(", "));
     }
 
-    // 5. Success
+    // 6. Return the existing checkout URL for redirection
     return jsonResponse({
       success: true,
-      checkoutUrl: createData.draft_order.invoice_url,
+      checkoutUrl: orderBlock.checkoutUrl,
     });
 
   } catch (error) {

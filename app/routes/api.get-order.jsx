@@ -70,9 +70,8 @@ export async function loader({ request }) {
       images: images,       // Array of image URLs
       video: order.video,   // Video URL
       optionGroups: optionGroups,
-      // If you are later converting this to a real Shopify Draft Order, pass that ID here
-      // For now, we return the DB ID so the frontend has context
-      dbId: order.id 
+      isPurchased: order.isPurchased, // Include the new status
+      checkoutUrl: order.checkoutUrl  // Include the Shopify-generated checkout URL
     });
 
   } catch (error) {

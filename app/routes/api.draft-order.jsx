@@ -58,8 +58,8 @@ export async function action({ request }) {
       return Response.json({ success: true, isTemplate: true });
 
     } else {
-      // --- SAVE AS ORDER BLOCK ---
-      createdRecord = await db.orderBlock.create({
+      // --- SAVE AS ORDER BLOCK IN OUR DB ---
+      const createdRecord = await db.orderBlock.create({
         data: {
           shop,
           productTitle,
@@ -72,10 +72,122 @@ export async function action({ request }) {
         },
       });
 
-      // 4. Generate Link
-      const customerLink = `https://${shop}/pages/custom-order?token=${createdRecord.id}`;
+      // --- CALCULATE TOTAL PRICE ---
+      let totalPrice = 0;
+      optionGroups.forEach(group => {
+        group.values.forEach(val => {
+          totalPrice += parseFloat(val.price || 0);
+        });
+      });
+      // Ensure a base price if no options or price is 0
+      if (totalPrice === 0) {
+        totalPrice = 1.00; // Shopify Draft Orders require a positive price. Minimum 1.00.
+      }
 
-      return Response.json({ success: true, customerLink });
+      // --- PREPARE LINE ITEMS FOR SHOPIFY DRAFT ORDER ---
+      const lineItemCustomAttributes = [];
+      optionGroups.forEach(group => {
+          group.values.forEach(val => {
+              lineItemCustomAttributes.push({ key: `${group.name} - ${val.label}`, value: val.price });
+          });
+      });
+
+      // Add main image as custom attribute if available
+      if (images && images.length > 0) {
+        lineItemCustomAttributes.push({ key: "Product Image", value: images[0] });
+      }
+      if (video) {
+        lineItemCustomAttributes.push({ key: "Product Video", value: video });
+      }
+
+
+      const lineItems = [
+        {
+          title: productTitle,
+          quantity: 1,
+          originalUnitPrice: parseFloat(totalPrice.toFixed(2)),
+          customAttributes: lineItemCustomAttributes,
+        },
+      ];
+
+      // --- PREPARE CUSTOMER FOR SHOPIFY DRAFT ORDER ---
+      let customerInput = null;
+      if (customerEmail) {
+        customerInput = {
+          email: customerEmail,
+          firstName: customerName || "",
+          lastName: "", // Assuming no last name from current form
+        };
+      }
+
+      // --- CREATE SHOPIFY DRAFT ORDER ---
+      const createDraftOrderMutation = `
+        mutation draftOrderCreate($input: DraftOrderInput!) {
+          draftOrderCreate(input: $input) {
+            draftOrder {
+              id
+              invoiceUrl
+              customer {
+                id
+                email
+                displayName
+              }
+              lineItems {
+                nodes {
+                  title
+                  quantity
+                  originalUnitPrice {
+                    amount
+                  }
+                  customAttributes {
+                    key
+                    value
+                  }
+                }
+              }
+              tags
+              note
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const draftOrderInput = {
+        input: {
+          lineItems: lineItems,
+          customer: customerInput,
+          note: note,
+          tags: [`draft-order-app-id-${createdRecord.id}`], // Link to our internal OrderBlock ID
+        },
+      };
+      
+      const admin = await authenticate.admin(request);
+      const response = await admin.graphql(createDraftOrderMutation, draftOrderInput);
+      const responseJson = await response.json();
+
+      if (responseJson.errors || responseJson.data.draftOrderCreate.userErrors.length > 0) {
+        const errors = responseJson.errors?.map(err => err.message) || responseJson.data.draftOrderCreate.userErrors.map(err => err.message);
+        throw new Error("Shopify Draft Order creation failed: " + errors.join(", "));
+      }
+
+      const shopifyDraftOrder = responseJson.data.draftOrderCreate.draftOrder;
+      const shopifyDraftOrderId = shopifyDraftOrder.id;
+      const checkoutUrl = shopifyDraftOrder.invoiceUrl;
+
+      // --- UPDATE OUR ORDER BLOCK WITH SHOPIFY DRAFT ORDER DETAILS ---
+      await db.orderBlock.update({
+        where: { id: createdRecord.id },
+        data: {
+          shopifyDraftOrderId: shopifyDraftOrderId,
+          checkoutUrl: checkoutUrl,
+        },
+      });
+
+      return Response.json({ success: true, customerLink: checkoutUrl });
     }
 
   } catch (error) {

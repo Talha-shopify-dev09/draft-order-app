@@ -98,14 +98,16 @@ export default function ListDraftOrders() {
                 resourceName={{ singular: "draft order", plural: "draft orders" }}
                 items={orders}
                 renderItem={(order) => {
-                  const { id, productTitle, customerEmail, images, createdAt } = order;
+                  const { id, productTitle, customerEmail, images, createdAt, isPurchased, checkoutUrl } = order;
                   const primaryImage = images && images.length > 0 ? images[0] : null;
-                  const customerLink = getCustomerLink(id);
+
+                  const statusColor = isPurchased ? "success" : "warning";
+                  const statusText = isPurchased ? "Purchased" : "Pending Checkout";
 
                   return (
                     <ResourceItem
                       id={id}
-                      url={customerLink} // Link the item itself to the customer view
+                      url={checkoutUrl || "#"} // Use checkoutUrl for the link, fallback to #
                       media={
                         <Thumbnail
                           source={primaryImage || "https://cdn.shopify.com/s/files/1/0533/2088/1429/files/placeholder-images-product-square.png?format=webp&v=1653357753"}
@@ -117,19 +119,24 @@ export default function ListDraftOrders() {
                     >
                       <BlockStack gap="200">
                         <Text variant="bodyLg" fontWeight="bold" as="h3">
-                          <Link url={customerLink} removeUnderline monochrome>{productTitle}</Link>
+                          <Link url={checkoutUrl || "#"} removeUnderline monochrome>{productTitle}</Link>
                         </Text>
                         <InlineStack gap="400">
                            <Text variant="bodyMd" color="subdued">
                              Customer: {customerEmail || "N/A"}
                            </Text>
                            <Text variant="bodyMd" color="subdued">
-                              Status: <Text fontWeight="bold" as="span" color="warning">Pending Checkout</Text> {/* Placeholder */}
+                              Status: <Text fontWeight="bold" as="span" color={statusColor}>{statusText}</Text>
                            </Text>
                         </InlineStack>
                         <Text variant="bodyMd" color="subdued">
                           Created: {new Date(createdAt).toLocaleDateString()}
                         </Text>
+                        {checkoutUrl && (
+                          <Box>
+                            <Link url={checkoutUrl} external>View Checkout Page</Link>
+                          </Box>
+                        )}
                         <Box>
                           <fetcher.Form method="post">
                             <input type="hidden" name="orderId" value={id} />
