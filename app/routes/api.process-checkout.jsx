@@ -49,8 +49,7 @@ export async function action({ request }) {
       where: { id: body.id }, // Find by ID only
     });
 
-    // Important Security Check: Verify that the order belongs to the requesting shop
-    if (!orderBlock || orderBlock.shop !== shopFromClient) {
+    if (!orderBlock) {
       return createCorsResponse(shopFromClient, { success: false, error: "Custom order not found" }, 404);
     }
     
