@@ -68,7 +68,7 @@ export async function action({ request }) {
       {
         title: variantName || orderBlock.productTitle || "Custom Product",
         quantity: 1,
-        originalUnitPrice: parseFloat(price),
+        originalUnitPrice: price,
         customAttributes: lineItemCustomAttributes,
       },
     ];

@@ -105,7 +105,7 @@ export async function action({ request }) {
         {
           title: productTitle,
           quantity: 1,
-          originalUnitPrice: parseFloat(totalPrice.toFixed(2)),
+          originalUnitPrice: totalPrice.toFixed(2),
           customAttributes: lineItemCustomAttributes,
         },
       ];
