@@ -14,14 +14,14 @@ export const action = async ({ request }) => {
     case "ORDERS_CREATE":
       // Extract our internal OrderBlock ID from the order's tags
       const orderTags = payload.tags || [];
-      const orderBlockIdTag = orderTags.find(tag => tag.startsWith("draft-order-app-id-"));
+      const orderBlockIdTag = orderTags.find(tag => tag.startsWith("do_"));
 
       if (!orderBlockIdTag) {
-        console.warn(`ORDERS_CREATE webhook received but no matching 'draft-order-app-id-' tag found in order ${payload.id}`);
+        console.warn(`ORDERS_CREATE webhook received but no matching 'do_' tag found in order ${payload.id}`);
         return new Response(JSON.stringify({ message: "No matching OrderBlock ID tag found" }), { headers: { "Content-Type": "application/json" }, status: 200 });
       }
 
-      const internalOrderBlockId = orderBlockIdTag.replace("draft-order-app-id-", "");
+      const internalOrderBlockId = orderBlockIdTag.replace("do_", "");
       console.log(`Received ORDERS_CREATE for Shopify Order ID: ${payload.id}, linked to internal OrderBlock ID: ${internalOrderBlockId}`);
 
       try {

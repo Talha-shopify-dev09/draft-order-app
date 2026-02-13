@@ -148,7 +148,7 @@ export async function action({ request }) {
       input: {
         lineItems: lineItems,
         note: `${orderBlock.note || ""}${body.variantName ? `\nSelected by customer: ${body.variantName}` : ""}`,
-        tags: [`draft-order-app-id-${body.id}`],
+        tags: [`do_${body.id}`],
       },
     };
 
