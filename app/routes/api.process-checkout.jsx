@@ -122,8 +122,8 @@ export async function action({ request }) {
       {
         title: orderBlock.productTitle || "Custom Product",
         quantity: 1,
-        // MoneyInput expected in GraphQL
-        originalUnitPrice: { amount: priceAmount, currencyCode },
+        // MoneyInput expected in GraphQL (latest field is originalUnitPriceWithCurrency)
+        originalUnitPriceWithCurrency: { amount: priceAmount, currencyCode },
         customAttributes: lineItemCustomAttributes,
       },
     ];
