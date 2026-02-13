@@ -96,8 +96,12 @@ export async function action({ request }) {
       lineItemCustomAttributes.push({ key: "Preview Image", value: body.customImage });
     }
 
-    const priceAmount = String(body.price).trim();
-    const currencyCode = (body.currency || "USD").toString().trim();
+    const priceNumber = Number(String(body.price).replace(/[^\d.-]/g, ""));
+    if (!Number.isFinite(priceNumber) || priceNumber < 0) {
+      return createCorsResponse(shopFromClient, { success: false, error: "Invalid price" }, 400);
+    }
+    const priceAmount = priceNumber.toFixed(2);
+    const currencyCode = (body.currency || "USD").toString().trim().toUpperCase();
 
     const lineItems = [
       {
@@ -108,16 +112,6 @@ export async function action({ request }) {
         customAttributes: lineItemCustomAttributes,
       },
     ];
-
-    // Prepare Customer Input
-    let customerInput = null;
-    if (orderBlock.customerEmail) {
-      customerInput = {
-        email: orderBlock.customerEmail,
-        firstName: orderBlock.customerName || "",
-        lastName: "",
-      };
-    }
 
     // 5. Construct GraphQL Mutation for Draft Order Creation
     const createDraftOrderMutation = `
@@ -143,8 +137,9 @@ export async function action({ request }) {
       },
     };
 
-    if (customerInput) {
-      draftOrderInput.input.customer = customerInput;
+    if (orderBlock.customerEmail) {
+      // DraftOrderInput supports email/customerId, not customer object
+      draftOrderInput.input.email = orderBlock.customerEmail;
     }
     
     const response = await admin.graphql(createDraftOrderMutation, { variables: draftOrderInput });
