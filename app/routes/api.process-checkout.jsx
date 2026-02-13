@@ -80,15 +80,11 @@ export async function action({ request }) {
           draftOrder {
             id
             invoiceUrl
-            totalPrice {
-              amount
-            }
+            totalPrice
             lineItems(first: 1) {
               nodes {
                 title
-                originalUnitPrice {
-                  amount
-                }
+                originalUnitPrice
                 customAttributes {
                   key
                   value

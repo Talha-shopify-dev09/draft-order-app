@@ -136,9 +136,8 @@ export async function action({ request }) {
                 nodes {
                   title
                   quantity
-                  originalUnitPrice {
-                    amount
-                  }
+                  originalUnitPrice
+
                   customAttributes {
                     key
                     value
