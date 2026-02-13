@@ -142,8 +142,8 @@
     // IMPORTANT: Get store currency or default to USD
     const storeCurrency = '{{ shop.currency }}' || 'USD';
     
-    // Use dynamic appUrl from API response
-    let appUrl = '';
+    // Use App Proxy base path (configure this in Shopify Admin)
+    const appProxyBase = '/apps/draft-order';
     
     let orderData = null;
 
@@ -158,11 +158,10 @@
     document.getElementById('currency-code').textContent = storeCurrency;
 
     // Fetch Order
-    fetch(`/api/get-order?id=${id}&shop=${shop}`) // Use relative path initially
+    fetch(`${appProxyBase}/api/get-order?id=${id}&shop=${shop}`) // Via App Proxy
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            appUrl = data.appUrl; // Set appUrl from the response
             orderData = data;
             renderOrder(data);
         } else {
@@ -295,7 +294,7 @@
 
         const price = document.getElementById('product-price').textContent;
 
-        fetch(`${appUrl}/api/process-checkout`, {
+        fetch(`${appProxyBase}/api/process-checkout`, {
             method: 'POST',
             mode: 'cors',
             headers: {'Content-Type': 'application/json'},

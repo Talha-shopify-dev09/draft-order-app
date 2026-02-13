@@ -29,6 +29,11 @@ scopes = "read_customers,write_customers,write_draft_orders,read_draft_orders,re
 optional_scopes = [ ]
 use_legacy_install_flow = false
 
+[app_proxy]
+url = "https://socoba-draft-order-neon-prime.onrender.com"
+subpath = "draft-order"
+prefix = "apps"
+
 [auth]
 redirect_urls = [
   "https://socoba-draft-order-neon-prime.onrender.com/auth/callback",
