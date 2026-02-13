@@ -147,9 +147,9 @@
     
     let orderData = null;
 
-    if (!token) {
+    if (!id) {
        document.getElementById('order-error').style.display = 'block';
-       document.getElementById('error-message').textContent = 'Invalid Link: Missing Token.';
+       document.getElementById('error-message').textContent = 'Invalid Link: Missing ID.';
        document.getElementById('order-loading').style.display = 'none';
        return;
     }

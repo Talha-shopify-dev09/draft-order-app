@@ -71,7 +71,8 @@ export async function loader({ request }) {
       video: order.video,   // Video URL
       optionGroups: optionGroups,
       isPurchased: order.isPurchased, // Include the new status
-      checkoutUrl: order.checkoutUrl  // Include the Shopify-generated checkout URL
+      checkoutUrl: order.checkoutUrl,  // Include the Shopify-generated checkout URL
+      appUrl: process.env.SHOPIFY_APP_URL // Pass the app URL dynamically
     });
 
   } catch (error) {
