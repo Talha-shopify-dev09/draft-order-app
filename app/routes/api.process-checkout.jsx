@@ -48,7 +48,12 @@ export async function action({ request }) {
     }
 
     // 3. Authenticate with Shopify
-    const { admin } = await authenticate.admin(request);
+    const authResult = await authenticate.admin(request); // Get the full auth result
+    const admin = authResult.admin; // Explicitly get the admin client
+
+    if (!admin || typeof admin.graphql !== 'function') {
+      throw new Error("Shopify Admin GraphQL client is not available. Ensure proper authentication and setup.");
+    }
 
 
     // 4. Prepare Line Item for updating Shopify Draft Order
