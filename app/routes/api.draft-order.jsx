@@ -173,9 +173,15 @@ export async function action({ request }) {
       const response = await admin.graphql(createDraftOrderMutation, draftOrderInput);
       const responseJson = await response.json();
 
-      if (responseJson.errors || responseJson.data.draftOrderCreate.userErrors.length > 0) {
-        const errors = responseJson.errors?.map(err => err.message) || responseJson.data.draftOrderCreate.userErrors.map(err => err.message);
-        throw new Error("Shopify Draft Order creation failed: " + errors.join(", "));
+      if (responseJson.errors) {
+        throw new Error("Shopify GraphQL API error: " + responseJson.errors.map(err => err.message).join(", "));
+      }
+      if (responseJson.data.draftOrderCreate.userErrors.length > 0) {
+        const userErrors = responseJson.data.draftOrderCreate.userErrors;
+        const formattedErrors = userErrors.map(err => {
+          return `${err.field ? `Field '${err.field.join(".")}'`: "General"}: ${err.message}`;
+        }).join("; ");
+        throw new Error("Shopify Draft Order creation failed: " + formattedErrors);
       }
 
       const shopifyDraftOrder = responseJson.data.draftOrderCreate.draftOrder;

@@ -112,9 +112,15 @@ export async function action({ request }) {
     const response = await admin.graphql(draftOrderUpdateMutation, draftOrderInput);
     const responseJson = await response.json();
 
-    if (responseJson.errors || responseJson.data.draftOrderUpdate.userErrors.length > 0) {
-      const errors = responseJson.errors?.map(err => err.message) || responseJson.data.draftOrderUpdate.userErrors.map(err => err.message);
-      throw new Error("Shopify Draft Order update failed: " + errors.join(", "));
+    if (responseJson.errors) {
+      throw new Error("Shopify GraphQL API error: " + responseJson.errors.map(err => err.message).join(", "));
+    }
+    if (responseJson.data.draftOrderUpdate.userErrors.length > 0) {
+      const userErrors = responseJson.data.draftOrderUpdate.userErrors;
+      const formattedErrors = userErrors.map(err => {
+        return `${err.field ? `Field '${err.field.join(".")}'`: "General"}: ${err.message}`;
+      }).join("; ");
+      throw new Error("Shopify Draft Order update failed: " + formattedErrors);
     }
 
     // 6. Return the existing checkout URL for redirection
