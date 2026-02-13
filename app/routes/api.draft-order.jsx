@@ -145,7 +145,6 @@ export async function action({ request }) {
                 }
               }
               tags
-              note
             }
             userErrors {
               field
