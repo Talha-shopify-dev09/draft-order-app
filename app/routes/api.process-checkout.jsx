@@ -138,24 +138,36 @@ export async function action({ request }) {
     const draftOrderInput = {
       input: {
         lineItems: lineItems,
-        customer: customerInput,
-        note: orderBlock.note + (body.variantName ? `\nSelected by customer: ${body.variantName}` : ""),
+        note: `${orderBlock.note || ""}${body.variantName ? `\nSelected by customer: ${body.variantName}` : ""}`,
         tags: [`draft-order-app-id-${body.id}`],
       },
     };
+
+    if (customerInput) {
+      draftOrderInput.input.customer = customerInput;
+    }
     
     const response = await admin.graphql(createDraftOrderMutation, { variables: draftOrderInput });
     const responseJson = await response.json();
 
     if (responseJson.errors) {
       console.error("Shopify GraphQL API graphQLErrors (create):", JSON.stringify(responseJson.errors, null, 2));
-      throw new Error("Shopify GraphQL API error: " + responseJson.errors.map(err => err.message).join(", "));
+      return createCorsResponse(shopFromClient, {
+        success: false,
+        error: "Shopify GraphQL API error",
+        graphQLErrors: responseJson.errors,
+      }, 500);
     }
-    if (responseJson.data.draftOrderCreate.userErrors.length > 0) {
-      const userErrors = responseJson.data.draftOrderCreate.userErrors;
+
+    const userErrors = responseJson.data?.draftOrderCreate?.userErrors || [];
+    if (userErrors.length > 0) {
       console.error("Shopify Draft Order creation user errors:", JSON.stringify(userErrors, null, 2));
       const formattedErrors = userErrors.map(err => `${err.field ? `Field '${err.field.join(".")}'`: "General"}: ${err.message}`).join("; ");
-      throw new Error("Shopify Draft Order creation failed: " + formattedErrors);
+      return createCorsResponse(shopFromClient, {
+        success: false,
+        error: "Shopify Draft Order creation failed: " + formattedErrors,
+        userErrors,
+      }, 400);
     }
 
     const shopifyDraftOrder = responseJson.data.draftOrderCreate.draftOrder;
