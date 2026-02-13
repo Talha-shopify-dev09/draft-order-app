@@ -170,6 +170,9 @@ export async function action({ request }) {
         throw new Error("Shopify Admin GraphQL client is not available. Ensure proper authentication and setup.");
       }
 
+      // Log the input to debug invalid value error
+      console.log("DEBUG: draftOrderInput sent to Shopify:", JSON.stringify(draftOrderInput, null, 2));
+      
       const response = await admin.graphql(createDraftOrderMutation, draftOrderInput);
       const responseJson = await response.json();
 

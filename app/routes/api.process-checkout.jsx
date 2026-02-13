@@ -109,6 +109,9 @@ export async function action({ request }) {
       },
     };
     
+    // Log the input to debug invalid value error
+    console.log("DEBUG: draftOrderInput sent to Shopify for update:", JSON.stringify(draftOrderInput, null, 2));
+    
     const response = await admin.graphql(draftOrderUpdateMutation, draftOrderInput);
     const responseJson = await response.json();
 
