@@ -138,7 +138,7 @@
   (function() {
     const urlParams = new URLSearchParams(window.location.search);
     const id = urlParams.get('id');
-    const shop = '{{ shop.domain }}';
+    const shop = '{{ shop.permanent_domain }}';
     // IMPORTANT: Get store currency or default to USD
     const storeCurrency = '{{ shop.currency }}' || 'USD';
     
