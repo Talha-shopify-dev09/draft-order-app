@@ -101,7 +101,22 @@ export async function action({ request }) {
       return createCorsResponse(shopFromClient, { success: false, error: "Invalid price" }, 400);
     }
     const priceAmount = priceNumber.toFixed(2);
-    const currencyCode = (body.currency || "USD").toString().trim().toUpperCase();
+    // Always use shop currency to avoid invalid MoneyInput
+    let currencyCode = "USD";
+    try {
+      const shopResp = await admin.graphql(`
+        query {
+          shop {
+            currencyCode
+          }
+        }
+      `);
+      const shopJson = await shopResp.json();
+      currencyCode = shopJson?.data?.shop?.currencyCode || currencyCode;
+    } catch (e) {
+      // Fallback to provided currency if shop query fails
+      currencyCode = (body.currency || currencyCode).toString().trim().toUpperCase();
+    }
 
     const lineItems = [
       {
