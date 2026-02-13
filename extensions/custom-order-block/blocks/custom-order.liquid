@@ -11,8 +11,38 @@
     </div>
     
     <div id="order-error" class="order-error" style="display: none;">
-      <h2>Order Not Found</h2>
-      <p id="error-message"></p>
+      <div class="order-content order-error-content">
+        <div class="media-section">
+          <div class="slider-wrapper blank-media">
+            <div class="blank-media-inner"></div>
+          </div>
+        </div>
+        <div class="product-details">
+          <h1 class="product-title">Order Not Found</h1>
+          <p id="error-message" class="product-note">
+            This order link is invalid or has expired.
+          </p>
+          <div class="price-display">
+            <span class="product-price">--</span>
+          </div>
+          <div class="options-container">
+            <div class="option-group">
+              <label class="option-label">Options</label>
+              <select class="option-select" disabled>
+                <option>Not available</option>
+              </select>
+            </div>
+          </div>
+          <button class="checkout-button" disabled>Proceed to Checkout</button>
+          <p class="secure-notice">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg> 
+            Secure checkout
+          </p>
+        </div>
+      </div>
     </div>
     
     <div id="order-content" class="order-content" style="display: none;">
@@ -61,6 +91,14 @@
 </div>
 
 <style>
+  :root {
+    --co-btn-bg: {{ section.settings.button_bg | default: "#000000" }};
+    --co-btn-text: {{ section.settings.button_text | default: "#ffffff" }};
+    --co-text: {{ section.settings.text_color | default: "#1a1a1a" }};
+    --co-note: {{ section.settings.note_color | default: "#555555" }};
+    --co-select-bg: {{ section.settings.select_bg | default: "#ffffff" }};
+    --co-select-border: {{ section.settings.select_border | default: "#e1e1e1" }};
+  }
   /* --- LAYOUT --- */
   .custom-order-block { max-width: 1100px; margin: 40px auto; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
   .custom-order-container { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; }
@@ -111,8 +149,8 @@
     flex-direction: column;
 }
   /* --- DETAILS --- */
-  .product-title { font-size: 28px; font-weight: 700; margin: 0 0 10px; color: #1a1a1a; line-height: 1.2; }
-  .product-note { color: #555; margin-bottom: 25px; line-height: 1.5; font-size: 15px; }
+  .product-title { font-size: 28px; font-weight: 700; margin: 0 0 10px; color: var(--co-text); line-height: 1.2; }
+  .product-note { color: var(--co-note); margin-bottom: 25px; line-height: 1.5; font-size: 15px; }
   .price-display { margin-bottom: 25px; display: flex; align-items: baseline; }
   .product-price { font-size: 32px; font-weight: 700; color: #2c2c2c; }
 
@@ -120,8 +158,8 @@
   .option-group { margin-bottom: 18px; }
   .option-label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; font-size: 14px; }
   .option-select { 
-    width: 100%; padding: 12px; border: 1px solid #e1e1e1; 
-    border-radius: 8px; font-size: 15px; background: white; 
+    width: 100%; padding: 12px; border: 1px solid var(--co-select-border); 
+    border-radius: 8px; font-size: 15px; background: var(--co-select-bg); 
     transition: border 0.2s; -webkit-appearance: none; appearance: none;
     background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23333%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
     background-repeat: no-repeat; background-position: right 12px center; background-size: 10px;
@@ -129,9 +167,14 @@
   .option-select:focus { border-color: #5469d4; outline: none; box-shadow: 0 0 0 2px rgba(84, 105, 212, 0.2); }
 
   /* --- BUTTON --- */
-  .checkout-button { width: 100%; padding: 16px; background: #000; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: opacity 0.2s; }
+  .checkout-button { width: 100%; padding: 16px; background: var(--co-btn-bg); color: var(--co-btn-text); border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: opacity 0.2s; }
   .checkout-button:hover { opacity: 0.9; }
   .secure-notice { display: flex; align-items: center; justify-content: center; gap: 6px; color: #777; font-size: 13px; margin-top: 12px; }
+
+  /* --- ERROR LAYOUT --- */
+  .order-error-content { display: grid; }
+  .blank-media { background: #f1f2f4; }
+  .blank-media-inner { width: 100%; height: 100%; }
 </style>
 
 <script>
@@ -332,6 +375,13 @@
 {
   "name": "Custom Order Block",
   "target": "section",
-  "settings": []
+  "settings": [
+    { "type": "color", "id": "button_bg", "label": "Button background", "default": "#000000" },
+    { "type": "color", "id": "button_text", "label": "Button text", "default": "#ffffff" },
+    { "type": "color", "id": "text_color", "label": "Heading text", "default": "#1a1a1a" },
+    { "type": "color", "id": "note_color", "label": "Body text", "default": "#555555" },
+    { "type": "color", "id": "select_bg", "label": "Dropdown background", "default": "#ffffff" },
+    { "type": "color", "id": "select_border", "label": "Dropdown border", "default": "#e1e1e1" }
+  ]
 }
 {% endschema %}
