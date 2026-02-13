@@ -1,4 +1,4 @@
-import { json } from "@remix-run/node";
+
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
 
@@ -7,7 +7,7 @@ export const action = async ({ request }) => {
 
   if (!payload || !payload.id) {
     console.error(`Webhook received without payload or ID for topic ${topic}`);
-    return json({ message: "Payload or ID missing" }, { status: 400 });
+    return new Response(JSON.stringify({ message: "Payload or ID missing" }), { headers: { "Content-Type": "application/json" }, status: 400 });
   }
 
   switch (topic) {
@@ -34,14 +34,14 @@ export const action = async ({ request }) => {
 
       } catch (error) {
         console.error(`Error updating OrderBlock for DRAFT_ORDERS_FINALIZED webhook: ${error}`);
-        return json({ message: "Failed to process webhook" }, { status: 500 });
+        return new Response(JSON.stringify({ message: "Failed to process webhook" }), { headers: { "Content-Type": "application/json" }, status: 500 });
       }
       break;
 
     default:
       console.warn(`Unhandled webhook topic: ${topic}`);
-      return json({ message: "Unhandled webhook topic" }, { status: 404 });
+      return new Response(JSON.stringify({ message: "Unhandled webhook topic" }), { headers: { "Content-Type": "application/json" }, status: 404 });
   }
 
-  return json({ message: "Webhook processed" }, { status: 200 });
+  return new Response(JSON.stringify({ message: "Webhook processed" }), { headers: { "Content-Type": "application/json" }, status: 200 });
 };
