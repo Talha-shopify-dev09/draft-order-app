@@ -2,7 +2,7 @@
 
 client_id = "af153ad9de62558664d5d3be5022f435"
 name = "Socoba Neon Prime DRaft Order"
-application_url = "https://draft-order-app-rk3s.onrender.com"
+application_url = "https://socoba-draft-order-neon-prime.onrender.com"
 embedded = true
 
 [build]
@@ -27,8 +27,8 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://draft-order-app-rk3s.onrender.com/auth/callback",
-  "https://draft-order-app-rk3s.onrender.com/auth/shopify/callback",
-  "https://draft-order-app-rk3s.onrender.com/api/auth/callback",
-  "https://draft-order-app-rk3s.onrender.com/login"
+  "https://socoba-draft-order-neon-prime.onrender.com/auth/callback",
+  "https://socoba-draft-order-neon-prime.onrender.com/auth/shopify/callback",
+  "https://socoba-draft-order-neon-prime.onrender.com/api/auth/callback",
+  "https://socoba-draft-order-neon-prime.onrender.com/login"
 ]
