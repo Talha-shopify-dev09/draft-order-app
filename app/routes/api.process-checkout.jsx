@@ -113,10 +113,13 @@ export async function action({ request }) {
     const responseJson = await response.json();
 
     if (responseJson.errors) {
+      // Log the full graphQLErrors array for debugging
+      console.error("Shopify GraphQL API graphQLErrors:", JSON.stringify(responseJson.errors, null, 2));
       throw new Error("Shopify GraphQL API error: " + responseJson.errors.map(err => err.message).join(", "));
     }
     if (responseJson.data.draftOrderUpdate.userErrors.length > 0) {
       const userErrors = responseJson.data.draftOrderUpdate.userErrors;
+      console.error("Shopify Draft Order update user errors:", JSON.stringify(userErrors, null, 2));
       const formattedErrors = userErrors.map(err => {
         return `${err.field ? `Field '${err.field.join(".")}'`: "General"}: ${err.message}`;
       }).join("; ");
