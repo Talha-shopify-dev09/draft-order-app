@@ -96,11 +96,15 @@ export async function action({ request }) {
       lineItemCustomAttributes.push({ key: "Preview Image", value: body.customImage });
     }
 
+    const priceAmount = String(body.price).trim();
+    const currencyCode = (body.currency || "USD").toString().trim();
+
     const lineItems = [
       {
         title: orderBlock.productTitle || "Custom Product",
         quantity: 1,
-        originalUnitPrice: body.price,
+        // MoneyInput expected in GraphQL
+        originalUnitPrice: { amount: priceAmount, currencyCode },
         customAttributes: lineItemCustomAttributes,
       },
     ];
