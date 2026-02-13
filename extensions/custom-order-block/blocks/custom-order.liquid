@@ -142,8 +142,8 @@
     // IMPORTANT: Get store currency or default to USD
     const storeCurrency = '{{ shop.currency }}' || 'USD';
     
-    // UPDATE THIS IF NEEDED
-    const appUrl = 'https://socoba-draft-order-neon-prime.onrender.com';
+    // Use dynamic appUrl from API response
+    let appUrl = '';
     
     let orderData = null;
 
@@ -158,10 +158,11 @@
     document.getElementById('currency-code').textContent = storeCurrency;
 
     // Fetch Order
-    fetch(`${appUrl}/api/get-order?id=${id}&shop=${shop}`)
+    fetch(`/api/get-order?id=${id}&shop=${shop}`) // Use relative path initially
     .then(res => res.json())
     .then(data => {
         if (data.success) {
+            appUrl = data.appUrl; // Set appUrl from the response
             orderData = data;
             renderOrder(data);
         } else {
