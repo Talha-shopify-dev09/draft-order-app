@@ -20,6 +20,8 @@ export default function App() {
       <PolarisAppProvider i18n={{}}>
         <s-app-nav>
           <s-link href="/app">Home</s-link>
+          <s-link href="/app/create-draft-order">Create Draft Order</s-link>
+          <s-link href="/app/list-draft-orders">My Draft Orders</s-link>
           <s-link href="/app/additional">Additional page</s-link>
         </s-app-nav>
         <Outlet />
