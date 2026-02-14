@@ -1,15 +1,16 @@
 {% comment %}
   Custom Order Block with Media Slider (Video First)
+  Visual refresh only, logic preserved.
 {% endcomment %}
 
 <div class="custom-order-block" id="custom-order-{{ section.id }}">
   <div class="custom-order-container">
-    
+
     <div id="order-loading" class="order-loading">
       <div class="spinner"></div>
       <p>Loading your order details...</p>
     </div>
-    
+
     <div id="order-error" class="order-error" style="display: none;">
       <div class="order-content order-error-content">
         <div class="media-section">
@@ -19,12 +20,34 @@
         </div>
         <div class="product-details">
           <h1 class="product-title">Order Not Found</h1>
+
+          <ul class="usp-list" aria-label="Product highlights">
+            <li class="usp-item">
+              <span class="usp-icon" aria-hidden="true">✓</span>
+              <span>{{block.settings.usp_1 }}</span>
+            </li>
+            <li class="usp-item">
+              <span class="usp-icon" aria-hidden="true">✓</span>
+              <span>{{block.settings.usp_2 }}</span>
+            </li>
+            <li class="usp-item">
+              <span class="usp-icon" aria-hidden="true">✓</span>
+              <span>{{block.settings.usp_3 }}</span>
+            </li>
+            <li class="usp-item">
+              <span class="usp-icon" aria-hidden="true">✓</span>
+              <span>{{block.settings.usp_4 }}</span>
+            </li>
+          </ul>
+
           <p id="error-message" class="product-note">
             This order link is invalid or has expired.
           </p>
+
           <div class="price-display">
             <span class="product-price">--</span>
           </div>
+
           <div class="options-container">
             <div class="option-group">
               <label class="option-label">Options</label>
@@ -33,55 +56,75 @@
               </select>
             </div>
           </div>
+
           <button class="checkout-button" disabled>Proceed to Checkout</button>
+
           <p class="secure-notice">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-            </svg> 
+            </svg>
             Secure checkout
           </p>
         </div>
       </div>
     </div>
-    
+
     <div id="order-content" class="order-content" style="display: none;">
-      
+
       <div class="media-section">
         <div class="slider-wrapper">
           <button id="prev-btn" class="slider-arrow left-arrow" style="display:none;">&#10094;</button>
-          
-          <div id="media-track" class="media-track">
-            </div>
+
+          <div id="media-track" class="media-track"></div>
 
           <button id="next-btn" class="slider-arrow right-arrow" style="display:none;">&#10095;</button>
         </div>
         <div id="slider-dots" class="slider-dots"></div>
       </div>
-      
+
       <div class="product-details">
-        <h1 id="product-title" class="product-title"></h1>
-        
+        <h2 id="product-title" class="product-title"></h2>
+
+        <ul class="usp-list" aria-label="Product highlights">
+          <li class="usp-item">
+            <span class="usp-icon" aria-hidden="true">✓</span>
+            <span>{{block.settings.usp_1 }}</span>
+          </li>
+          <li class="usp-item">
+            <span class="usp-icon" aria-hidden="true">✓</span>
+            <span>{{block.settings.usp_2 }}</span>
+          </li>
+          <li class="usp-item">
+            <span class="usp-icon" aria-hidden="true">✓</span>
+            <span>{{block.settings.usp_3 }}</span>
+          </li>
+          <li class="usp-item">
+            <span class="usp-icon" aria-hidden="true">✓</span>
+            <span>{{block.settings.usp_4 }}</span>
+          </li>
+        </ul>
+
         <div class="price-display">
           <span id="product-price" class="product-price">$0.00</span>
-          <span id="currency-code" style="font-size: 16px; color: #666; margin-left: 5px;">USD</span>
+          <span id="currency-code" class="currency-code">USD</span>
         </div>
-        
+
         <p id="product-note" class="product-note"></p>
-        
+
         <div id="options-container" class="options-container"></div>
-        
+
         <div id="checkout-error" class="checkout-error" style="display: none;"></div>
-        
+
         <button id="checkout-button" class="checkout-button">
           Proceed to Checkout
         </button>
-        
+
         <p class="secure-notice">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg> 
+          </svg>
           Secure checkout
         </p>
       </div>
@@ -92,84 +135,305 @@
 
 <style>
   :root {
-    --co-btn-bg: {{ section.settings.button_bg | default: "#000000" }};
-    --co-btn-text: {{ section.settings.button_text | default: "#ffffff" }};
-    --co-text: {{ section.settings.text_color | default: "#1a1a1a" }};
-    --co-note: {{ section.settings.note_color | default: "#555555" }};
-    --co-select-bg: {{ section.settings.select_bg | default: "#ffffff" }};
-    --co-select-border: {{ section.settings.select_border | default: "#e1e1e1" }};
+    --co-btn-bg: #ff7385;
+    --co-btn-text: {{block.settings.button_text | default: "#ffffff" }};
+    --co-text: {{block.settings.text_color | default: "#1a1a1a" }};
+    --co-note: {{block.settings.note_color | default: "#555555" }};
+    --co-card: #ffffff;
+    --co-soft: rgba(0,0,0,0.06);
+    --co-soft-2: rgba(0,0,0,0.10);
   }
+
   /* --- LAYOUT --- */
-  .custom-order-block { max-width: 1100px; margin: 40px auto; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-  .custom-order-container { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; }
-  
-  .order-content { display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; padding: 40px; }
-  @media (max-width: 768px) { .order-content { grid-template-columns: 1fr; padding: 20px; } }
+  .custom-order-block { max-width: 1700px; margin: 40px auto; padding: 0 16px; }
+  @media(min-width:749px){
+     .custom-order-block {
+    max-width: 95%;
+    min-width: 95%;}
+  }
+  .custom-order-container {
+    background: var(--co-card);
+    border-radius: 18px;
+    box-shadow: 0 14px 50px rgba(0,0,0,0.10);
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+
+  .order-content {
+    display: grid;
+    grid-template-columns: 1.15fr 0.95fr;
+    gap: 42px;
+    padding: 44px;
+  }
+  @media (max-width: 1024px) {
+    .order-content { grid-template-columns: 1fr; padding: 22px; gap: 26px; }
+  }
 
   /* --- SPINNER --- */
-  .order-loading { padding: 80px 20px; text-align: center; }
-  .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #5469d4; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px; }
+  .order-loading { padding: 84px 20px; text-align: center; }
+  .order-loading p { margin: 10px 0 0; color: #666; }
+  .spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid rgba(39, 119, 209, 1);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 10px;
+  }
   @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
   /* --- SLIDER STYLES --- */
   .media-section { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; }
-  .slider-wrapper { position: relative; width: 100%; height: 500px; background: #f8f9fa; border-radius: 10px; overflow: hidden; display: flex; align-items: center; }
-  
-  .media-track { 
-    display: flex; 
-    overflow-x: auto; 
-    scroll-behavior: smooth; 
-    width: 100%; 
-    height: 100%;
-    scrollbar-width: none; /* Hide scrollbar Firefox */
-    -ms-overflow-style: none; /* Hide scrollbar IE */
+  .slider-wrapper {
+    position: relative;
+    width: 100%;
+    height: 520px;
+    background: #f6f7f9;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 10px 26px rgba(0,0,0,0.08);
   }
-  .media-track::-webkit-scrollbar { display: none; } /* Hide scrollbar Chrome */
+  @media (max-width: 768px) {
+    .slider-wrapper { height: 420px; border-radius: 14px; }
+  }
 
-  .media-item { flex: 0 0 100%; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
-  
-  .media-item img { width: 100%; height: 100%; object-fit: contain; background: #f8f9fa; }
+  .media-track {
+    display: flex;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    width: 100%;
+    height: 100%;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .media-track::-webkit-scrollbar { display: none; }
+
+  .media-item {
+    flex: 0 0 100%;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+  }
+
+  .media-item img { width: 100%; height: 100%; object-fit: contain; background: #f6f7f9; }
   .media-item video { width: 100%; height: 100%; object-fit: contain; background: #000; }
 
   /* --- ARROWS --- */
-  .slider-arrow { 
-    position: absolute; top: 50%; transform: translateY(-50%); 
-    background: rgba(255, 255, 255, 0.8); border: none; cursor: pointer; 
-    width: 40px; height: 40px; border-radius: 50%; 
-    font-size: 20px; color: #333; z-index: 10;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: all 0.2s;
+  .slider-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(0,0,0,0.10);
+    cursor: pointer;
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    font-size: 20px;
+    color: #222;
+    z-index: 10;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    backdrop-filter: blur(6px);
   }
-  .slider-arrow:hover { background: white; transform: translateY(-50%) scale(1.1); }
-  .left-arrow { left: 15px; }
-  .right-arrow { right: 15px; }
-.product-details {
+  .slider-arrow:hover {
+    background: #fff;
+    transform: translateY(-50%) scale(1.06);
+    box-shadow: 0 14px 28px rgba(0,0,0,0.16);
+  }
+  .left-arrow { left: 14px; }
+  .right-arrow { right: 14px; }
+
+  /* --- DETAILS --- */
+  .product-details {
     display: flex;
     align-self: start;
     justify-content: center;
     flex-direction: column;
-}
-  /* --- DETAILS --- */
-  .product-title { font-size: 28px; font-weight: 700; margin: 0 0 10px; color: var(--co-text); line-height: 1.2; }
-  .product-note { color: var(--co-note); margin-bottom: 25px; line-height: 1.5; font-size: 15px; }
-  .price-display { margin-bottom: 25px; display: flex; align-items: baseline; }
-  .product-price { font-size: 32px; font-weight: 700; color: #2c2c2c; }
-
-  /* --- DROPDOWNS --- */
-  .option-group { margin-bottom: 18px; }
-  .option-label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; font-size: 14px; }
-  .option-select { 
-    width: 100%; padding: 12px; border: 1px solid var(--co-select-border); 
-    border-radius: 8px; font-size: 15px; background: var(--co-select-bg); 
-    transition: border 0.2s; -webkit-appearance: none; appearance: none;
-    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23333%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-    background-repeat: no-repeat; background-position: right 12px center; background-size: 10px;
   }
-  .option-select:focus { border-color: #5469d4; outline: none; box-shadow: 0 0 0 2px rgba(84, 105, 212, 0.2); }
+  .product-title {
+    font-size: 30px;
+    font-weight: 750;
+    margin: 0 0 12px;
+    color: var(--co-text);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  .usp-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 18px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  @media (min-width: 900px) {
+    .usp-list { grid-template-columns: 1fr 1fr; }
+  }
+  .usp-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 115, 133, 0.10);
+    border: 1px solid rgba(255, 115, 133, 0.22);
+    color: #2a2a2a;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+  .usp-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #fff;
+    background: #ff7385;
+    flex: 0 0 18px;
+    margin-top: 1px;
+  }
+
+  .product-note {
+    color: var(--co-note);
+    margin: 0 0 18px;
+    line-height: 1.6;
+    font-size: 15px;
+  }
+
+  .price-display {
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .product-price {
+    font-size: 26px;
+    font-weight: 800;
+    color: #ff7385;
+    padding: 10px 14px;
+    border-radius: 12px;
+    letter-spacing: -0.01em;
+    box-shadow: 0 10px 20px rgba(255, 115, 133, 0.28);
+  }
+  .currency-code {
+    font-size: 14px;
+    color: #ff7385;
+  }
+
+  /* --- OPTIONS (BUTTON STYLE) --- */
+  .options-container { margin-top: 6px; }
+
+  .option-group {
+    margin-bottom: 16px;
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(0,0,0,0.03);
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+
+  .option-label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #2b2b2b;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+  }
+
+  .option-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .option-btn {
+    appearance: none;
+    border: 2px solid rgba(0,0,0,0.08);
+    background: #fff;
+    color: #222;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 650;
+    cursor: pointer;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+  }
+
+  .option-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(0,0,0,0.10);
+    border-color: rgba(255, 115, 133, 0.45);
+  }
+
+  .option-btn.is-active {
+    color: #ff7385 !important;
+    background: linear-gradient(#fff, #fff) padding-box,
+      linear-gradient(90deg, rgba(39, 119, 209, 1) 0%, rgba(255, 115, 133, 1) 89%) border-box !important;
+    border: 2px solid transparent !important;
+    box-shadow: 0 14px 28px rgba(255, 115, 133, 0.18);
+  }
+
+  /* Keep selects if any legacy appears (hidden) */
+  .option-select { display: none !important; }
 
   /* --- BUTTON --- */
-  .checkout-button { width: 100%; padding: 16px; background: var(--co-btn-bg); color: var(--co-btn-text); border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: opacity 0.2s; }
-  .checkout-button:hover { opacity: 0.9; }
-  .secure-notice { display: flex; align-items: center; justify-content: center; gap: 6px; color: #777; font-size: 13px; margin-top: 12px; }
+  .checkout-button {
+    width: 100%;
+    padding: 16px;
+    background: #ff7385;
+    color: var(--co-btn-text);
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 750;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+    box-shadow: 0 14px 30px rgba(255, 115, 133, 0.28);
+  }
+
+  .checkout-button:hover {
+    color: #ff7385 !important;
+    background: linear-gradient(#fff, #fff) padding-box,
+      linear-gradient(90deg, rgba(39, 119, 209, 1) 0%, rgba(255, 115, 133, 1) 89%) border-box !important;
+    border: 2px solid transparent !important;
+    transform: translateY(-1px);
+  }
+
+  .checkout-button:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .secure-notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #6f6f6f;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+
+  .checkout-error {
+    margin-top: 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(255, 115, 133, 0.10);
+    border: 1px solid rgba(255, 115, 133, 0.22);
+    color: #7a1f2b;
+    font-size: 14px;
+  }
 
   /* --- ERROR LAYOUT --- */
   .order-error-content { display: grid; }
@@ -182,190 +446,211 @@
     const urlParams = new URLSearchParams(window.location.search);
     const id = urlParams.get('id');
     const shop = '{{ shop.permanent_domain }}';
-    // IMPORTANT: Get store currency or default to USD
     const storeCurrency = '{{ shop.currency }}' || 'USD';
-    
-    // Use App Proxy base path (configure this in Shopify Admin)
+
     const appProxyBase = '/apps/draft-order';
-    
+
     let orderData = null;
 
     if (!id) {
-       document.getElementById('order-error').style.display = 'block';
-       document.getElementById('error-message').textContent = 'Invalid Link: Missing ID.';
-       document.getElementById('order-loading').style.display = 'none';
-       return;
+      document.getElementById('order-error').style.display = 'block';
+      document.getElementById('error-message').textContent = 'Invalid Link: Missing ID.';
+      document.getElementById('order-loading').style.display = 'none';
+      return;
     }
 
-    // Initialize UI
     document.getElementById('currency-code').textContent = storeCurrency;
 
-    // Fetch Order
-    fetch(`${appProxyBase}/api/get-order?id=${id}&shop=${shop}`) // Via App Proxy
-    .then(res => res.json())
-    .then(data => {
+    fetch(`${appProxyBase}/api/get-order?id=${id}&shop=${shop}`)
+      .then(res => res.json())
+      .then(data => {
         if (data.success) {
-            orderData = data;
-            renderOrder(data);
+          orderData = data;
+          renderOrder(data);
         } else {
-            throw new Error(data.error || "Order not found");
+          throw new Error(data.error || "Order not found");
         }
-    })
-    .catch(err => {
+      })
+      .catch(err => {
         console.error(err);
         document.getElementById('order-loading').style.display = 'none';
         document.getElementById('order-error').style.display = 'block';
         document.getElementById('error-message').textContent = "We couldn't load this order. It may have expired.";
-    });
+      });
 
     function renderOrder(data) {
-        document.getElementById('order-loading').style.display = 'none';
-        document.getElementById('order-content').style.display = 'grid';
+      document.getElementById('order-loading').style.display = 'none';
+      document.getElementById('order-content').style.display = 'grid';
 
-        // --- 1. SLIDER LOGIC (VIDEO FIRST) ---
-        const track = document.getElementById('media-track');
-        track.innerHTML = ''; // Clear previous
-        
-        let mediaCount = 0;
+      // --- 1. SLIDER LOGIC (VIDEO FIRST) ---
+      const track = document.getElementById('media-track');
+      track.innerHTML = '';
 
-        // A. Video (Highest Priority)
-        if (data.video) {
-            const vidItem = document.createElement('div');
-            vidItem.className = 'media-item';
-            vidItem.innerHTML = `<video controls playsinline><source src="${data.video}" type="video/mp4"></video>`;
-            track.appendChild(vidItem);
-            mediaCount++;
-        }
+      let mediaCount = 0;
 
-        // B. Images (Loop through array)
-        let imagesList = [];
-        if (Array.isArray(data.images)) {
-            imagesList = data.images;
-        } else if (data.productImage) {
-            // Fallback for old data
-            imagesList = [data.productImage]; 
-        }
+      if (data.video) {
+        const vidItem = document.createElement('div');
+        vidItem.className = 'media-item';
+        vidItem.innerHTML = `<video controls playsinline><source src="${data.video}" type="video/mp4"></video>`;
+        track.appendChild(vidItem);
+        mediaCount++;
+      }
 
-        imagesList.forEach(imgUrl => {
-            const imgItem = document.createElement('div');
-            imgItem.className = 'media-item';
-            imgItem.innerHTML = `<img src="${imgUrl}" alt="Custom Product">`;
-            track.appendChild(imgItem);
-            mediaCount++;
+      let imagesList = [];
+      if (Array.isArray(data.images)) {
+        imagesList = data.images;
+      } else if (data.productImage) {
+        imagesList = [data.productImage];
+      }
+
+      imagesList.forEach(imgUrl => {
+        const imgItem = document.createElement('div');
+        imgItem.className = 'media-item';
+        imgItem.innerHTML = `<img src="${imgUrl}" alt="Custom Product">`;
+        track.appendChild(imgItem);
+        mediaCount++;
+      });
+
+      const prevBtn = document.getElementById('prev-btn');
+      const nextBtn = document.getElementById('next-btn');
+
+      if (mediaCount > 1) {
+        prevBtn.style.display = 'block';
+        nextBtn.style.display = 'block';
+
+        nextBtn.onclick = () => track.scrollBy({ left: track.offsetWidth, behavior: 'smooth' });
+        prevBtn.onclick = () => track.scrollBy({ left: -track.offsetWidth, behavior: 'smooth' });
+      } else if (mediaCount === 0) {
+        track.innerHTML = '<div class="media-item"><p style="color:#fff">No Preview Available</p></div>';
+      }
+
+      // --- 2. TEXT DETAILS ---
+      document.getElementById('product-title').textContent = data.productTitle;
+      document.getElementById('product-note').textContent = data.note || "";
+
+      // --- 3. OPTIONS (BUTTON UI, SAME PRICING LOGIC) ---
+      const container = document.getElementById('options-container');
+      container.innerHTML = '';
+
+      if (!data.optionGroups || data.optionGroups.length === 0) {
+        updatePrice();
+      } else {
+        data.optionGroups.forEach((group, groupIndex) => {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'option-group';
+
+          const label = document.createElement('div');
+          label.className = 'option-label';
+          label.textContent = group.name;
+
+          const btnWrap = document.createElement('div');
+          btnWrap.className = 'option-buttons';
+          btnWrap.setAttribute('role', 'group');
+          btnWrap.setAttribute('aria-label', group.name);
+
+          group.values.forEach((val, valIndex) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'option-btn';
+            btn.textContent = `${val.label} (+${val.price} ${storeCurrency})`;
+            btn.dataset.value = val.label;
+            btn.dataset.price = val.price;
+            btn.dataset.group = group.name;
+
+            // default select first option in each group
+            if (valIndex === 0) btn.classList.add('is-active');
+
+            btn.addEventListener('click', () => {
+              // toggle active inside this group only
+              btnWrap.querySelectorAll('.option-btn').forEach(b => b.classList.remove('is-active'));
+              btn.classList.add('is-active');
+              updatePrice();
+            });
+
+            btnWrap.appendChild(btn);
+          });
+
+          wrapper.appendChild(label);
+          wrapper.appendChild(btnWrap);
+          container.appendChild(wrapper);
         });
 
-        // C. Slider Controls (Hide arrows if only 1 item)
-        const prevBtn = document.getElementById('prev-btn');
-        const nextBtn = document.getElementById('next-btn');
-
-        if (mediaCount > 1) {
-            prevBtn.style.display = 'block';
-            nextBtn.style.display = 'block';
-            
-            // Scroll Logic
-            nextBtn.onclick = () => track.scrollBy({ left: track.offsetWidth, behavior: 'smooth' });
-            prevBtn.onclick = () => track.scrollBy({ left: -track.offsetWidth, behavior: 'smooth' });
-        } else if (mediaCount === 0) {
-           // Fallback if NO media exists
-           track.innerHTML = '<div class="media-item"><p>No Preview Available</p></div>';
-        }
-
-        // --- 2. TEXT DETAILS ---
-        document.getElementById('product-title').textContent = data.productTitle;
-        document.getElementById('product-note').textContent = data.note || "";
-
-        // --- 3. OPTIONS ---
-        const container = document.getElementById('options-container');
-        container.innerHTML = '';
-
-        if (!data.optionGroups || data.optionGroups.length === 0) {
-            // If no options, set base price and hide dropdowns
-            updatePrice();
-        } else {
-            data.optionGroups.forEach(group => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'option-group';
-                
-                const label = document.createElement('label');
-                label.className = 'option-label';
-                label.textContent = group.name;
-                
-                const select = document.createElement('select');
-                select.className = 'option-select';
-                
-                group.values.forEach(val => {
-                    const opt = document.createElement('option');
-                    opt.value = val.label;
-                    opt.dataset.price = val.price;
-                    opt.textContent = `${val.label} (+${val.price} ${storeCurrency})`;
-                    select.appendChild(opt);
-                });
-
-                select.addEventListener('change', updatePrice);
-                wrapper.appendChild(label);
-                wrapper.appendChild(select);
-                container.appendChild(wrapper);
-            });
-            updatePrice(); // Initial calc
-        }
+        updatePrice();
+      }
     }
 
     function updatePrice() {
-        let total = 0;
-        document.querySelectorAll('.option-select').forEach(sel => {
-            const opt = sel.options[sel.selectedIndex];
-            total += parseFloat(opt.dataset.price || 0);
+      let total = 0;
+
+      // Sum active button prices (new UI)
+      const activeBtns = document.querySelectorAll('.option-btn.is-active');
+      if (activeBtns.length > 0) {
+        activeBtns.forEach(btn => {
+          total += parseFloat(btn.dataset.price || 0);
         });
-        document.getElementById('product-price').textContent = total.toFixed(2);
+      } else {
+        // Fallback to legacy selects if ever present
+        document.querySelectorAll('.option-select').forEach(sel => {
+          const opt = sel.options[sel.selectedIndex];
+          total += parseFloat(opt.dataset.price || 0);
+        });
+      }
+
+      document.getElementById('product-price').textContent = total.toFixed(2);
     }
-    
+
     // --- 4. CHECKOUT ---
     document.getElementById('checkout-button').addEventListener('click', () => {
-        const btn = document.getElementById('checkout-button');
-        const errBox = document.getElementById('checkout-error');
-        
-        btn.disabled = true;
-        btn.textContent = "Processing...";
-        errBox.style.display = 'none';
+      const btn = document.getElementById('checkout-button');
+      const errBox = document.getElementById('checkout-error');
 
-        // Collect Variants
+      btn.disabled = true;
+      btn.textContent = "Processing...";
+      errBox.style.display = 'none';
+
+      // Collect Variants (from active buttons first, fallback to selects)
+      let variantName = "Custom Selection";
+
+      const activeBtns = Array.from(document.querySelectorAll('.option-btn.is-active'));
+      if (activeBtns.length > 0) {
+        variantName = activeBtns.map(b => b.dataset.value).join(' / ');
+      } else {
         const selects = document.querySelectorAll('.option-select');
-        let variantName = "Custom Selection";
         if (selects.length > 0) {
-            variantName = Array.from(selects).map(s => s.value).join(' / ');
+          variantName = Array.from(selects).map(s => s.value).join(' / ');
         }
+      }
 
-        const price = document.getElementById('product-price').textContent;
+      const price = document.getElementById('product-price').textContent;
 
-        fetch(`${appProxyBase}/api/process-checkout`, {
-            method: 'POST',
-            mode: 'cors',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                id: id,
-                draftOrderId: orderData.draftOrderId,
-                variantName: variantName,
-                price: price,
-                shop: shop,
-                currency: storeCurrency,
-                // Send the first image as the thumbnail for reference
-                customImage: orderData.images && orderData.images.length > 0 ? orderData.images[0] : null
-            })
+      fetch(`${appProxyBase}/api/process-checkout`, {
+        method: 'POST',
+        mode: 'cors',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          id: id,
+          draftOrderId: orderData.draftOrderId,
+          variantName: variantName,
+          price: price,
+          shop: shop,
+          currency: storeCurrency,
+          customImage: orderData.images && orderData.images.length > 0 ? orderData.images[0] : null
         })
-        .then(res => res.json())
-        .then(data => {
-            if(data.checkoutUrl) {
-                window.location.href = data.checkoutUrl;
-            } else {
-                throw new Error(data.error || 'Checkout failed');
-            }
-        })
-        .catch(err => {
-            btn.disabled = false;
-            btn.textContent = "Proceed to Checkout";
-            errBox.style.display = 'block';
-            errBox.textContent = err.message;
-        });
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.checkoutUrl) {
+          window.location.href = data.checkoutUrl;
+        } else {
+          throw new Error(data.error || 'Checkout failed');
+        }
+      })
+      .catch(err => {
+        btn.disabled = false;
+        btn.textContent = "Proceed to Checkout";
+        errBox.style.display = 'block';
+        errBox.textContent = err.message;
+      });
     });
 
   })();
@@ -376,12 +661,14 @@
   "name": "Custom Order Block",
   "target": "section",
   "settings": [
-    { "type": "color", "id": "button_bg", "label": "Button background", "default": "#000000" },
     { "type": "color", "id": "button_text", "label": "Button text", "default": "#ffffff" },
     { "type": "color", "id": "text_color", "label": "Heading text", "default": "#1a1a1a" },
     { "type": "color", "id": "note_color", "label": "Body text", "default": "#555555" },
-    { "type": "color", "id": "select_bg", "label": "Dropdown background", "default": "#ffffff" },
-    { "type": "color", "id": "select_border", "label": "Dropdown border", "default": "#e1e1e1" }
+
+    { "type": "text", "id": "usp_1", "label": "USP 1" },
+    { "type": "text", "id": "usp_2", "label": "USP 2" },
+    { "type": "text", "id": "usp_3", "label": "USP 3" },
+    { "type": "text", "id": "usp_4", "label": "USP 4" }
   ]
 }
 {% endschema %}
