@@ -251,41 +251,44 @@ export default function CreateDraftOrder() {
         return;
       }
 
-      // -- A. Upload Images --
-      const uploadedImageUrls = [];
-      for (const imgObj of formData.images) {
-        const imageBase64 = await fileToBase64(imgObj.file);
-        
-        const uploadResponse = await fetch("/api/upload-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: imageBase64, type: 'image' }),
-        });
-
-        const uploadData = await uploadResponse.json();
-        if (uploadData.success) {
-          uploadedImageUrls.push(uploadData.imageUrl);
-        } else {
-          throw new Error("Failed to upload image: " + uploadData.error);
-        }
-      }
-
-      // -- B. Upload Video --
+      let uploadedImageUrls = [];
       let uploadedVideoUrl = null;
-      if (formData.video) {
-        const videoBase64 = await fileToBase64(formData.video.file);
-        
-        const uploadResponse = await fetch("/api/upload-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: videoBase64, type: 'video' }), 
-        });
 
-        const uploadData = await uploadResponse.json();
-        if (uploadData.success) {
-          uploadedVideoUrl = uploadData.imageUrl;
-        } else {
-          throw new Error("Failed to upload video: " + uploadData.error);
+      if (!saveAsTemplate) {
+        // -- A. Upload Images --
+        for (const imgObj of formData.images) {
+          const imageBase64 = await fileToBase64(imgObj.file);
+          
+          const uploadResponse = await fetch("/api/upload-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: imageBase64, type: 'image' }),
+          });
+
+          const uploadData = await uploadResponse.json();
+          if (uploadData.success) {
+            uploadedImageUrls.push(uploadData.imageUrl);
+          } else {
+            throw new Error("Failed to upload image: " + uploadData.error);
+          }
+        }
+
+        // -- B. Upload Video --
+        if (formData.video) {
+          const videoBase64 = await fileToBase64(formData.video.file);
+          
+          const uploadResponse = await fetch("/api/upload-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: videoBase64, type: 'video' }), 
+          });
+
+          const uploadData = await uploadResponse.json();
+          if (uploadData.success) {
+            uploadedVideoUrl = uploadData.imageUrl;
+          } else {
+            throw new Error("Failed to upload video: " + uploadData.error);
+          }
         }
       }
 
